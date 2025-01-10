@@ -13,6 +13,7 @@ struct WindowDesc {
     u32 height;
     const char* title;
     b8 resizable;
+    b8 vsync;
     ResizeCallback resize_cb;
 };
 

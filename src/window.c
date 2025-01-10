@@ -8,6 +8,7 @@ struct Window {
     b8 is_open;
     u32 width;
     u32 height;
+    b8 vsync;
 
     ResizeCallback resize_cb;
 };
@@ -46,11 +47,16 @@ Window* window_create(WDL_Arena* arena, WindowDesc desc) {
         .is_open = true,
         .width = desc.width,
         .height = desc.height,
+        .vsync = desc.vsync,
         .resize_cb = desc.resize_cb,
     };
     glfwSetWindowUserPointer(window->handle, window);
     glfwSetWindowCloseCallback(window->handle, close_cb);
     glfwSetFramebufferSizeCallback(window->handle, internal_resize_cb);
+
+    glfwMakeContextCurrent(window->handle);
+    glfwSwapInterval(desc.vsync);
+    glfwMakeContextCurrent(NULL);
 
     return window;
 }
