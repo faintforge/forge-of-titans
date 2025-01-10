@@ -25,6 +25,8 @@ target_include_directories(${CMAKE_PROJECT_NAME}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/waddle/"
 )
 
+target_link_libraries(${CMAKE_PROJECT_NAME} glfw)
+
 if (EMSCRIPTEN)
     execute_process(COMMAND emcc --cflags OUTPUT_VARIABLE EM_CFLAGS)
     get_target_property(CFLAGS ${CMAKE_PROJECT_NAME} COMPILE_FLAGS)
