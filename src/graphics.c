@@ -237,6 +237,15 @@ GfxColor gfx_color_hsv(f32 hue, f32 saturation, f32 value) {
 
 GfxBuffer gfx_buffer_new(GfxBufferDesc desc) {
     BufferNode* node = buffer_pool_get_handle(&state.buffer_pool);
+    GfxBuffer buffer = { .handle = node };
+    gfx_buffer_resize(buffer, desc);
+    return buffer;
+}
+
+void gfx_buffer_resize(GfxBuffer buffer, GfxBufferDesc desc) {
+    ASSERT(!gfx_buffer_is_null(buffer), "Cannot resize a NULL buffer!");
+
+    BufferNode* node = buffer.handle;
     node->size = desc.size;
 
     GLenum gl_usage;
@@ -255,8 +264,16 @@ GfxBuffer gfx_buffer_new(GfxBufferDesc desc) {
     glBindBuffer(BUFFER_OP_TARGET, node->gl_handle);
     glBufferData(BUFFER_OP_TARGET, desc.size, desc.data, gl_usage);
     glBindBuffer(BUFFER_OP_TARGET, 0);
+}
 
-    return (GfxBuffer) { .handle = node };
+void gfx_buffer_subdata(GfxBuffer buffer, const void* data, u32 size, u32 offset) {
+    ASSERT(!gfx_buffer_is_null(buffer), "Cannot enter subdata into a NULL buffer!");
+
+    BufferNode* node = buffer.handle;
+    ASSERT(offset + size <= node->size, "Buffer overflow. Trying to write outside of the buffers capacity. Run 'gfx_buffer_resize()' to change the size.");
+
+    glBindBuffer(BUFFER_OP_TARGET, node->gl_handle);
+    glBufferSubData(BUFFER_OP_TARGET, offset, size, data);
 }
 
 b8 gfx_buffer_is_null(GfxBuffer buffer) {

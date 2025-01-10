@@ -55,6 +55,8 @@ struct GfxBufferDesc {
 #define GFX_BUFFER_NULL ((GfxBuffer) { NULL })
 
 extern GfxBuffer gfx_buffer_new(GfxBufferDesc desc);
+extern void      gfx_buffer_resize(GfxBuffer buffer, GfxBufferDesc desc);
+extern void      gfx_buffer_subdata(GfxBuffer buffer, const void* data, u32 size, u32 offset);
 extern b8        gfx_buffer_is_null(GfxBuffer buffer);
 
 // -- Vertex array -------------------------------------------------------------
