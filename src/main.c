@@ -110,7 +110,23 @@ i32 main(void) {
 
     // -------------------------------------------------------------------------
 
+    u32 fps = 0;
+    f32 fps_timer = 0.0f;
+
+    f32 last = 0.0f;
     while (window_is_open(window)) {
+        f32 curr = wdl_os_get_time();
+        f32 dt = curr - last;
+        last = curr;
+
+        fps++;
+        fps_timer += dt;
+        if (fps_timer >= 1.0f) {
+            WDL_INFO("FPS: %u", fps);
+            fps_timer = 0;
+            fps = 0;
+        }
+
         gfx_clear(gfx_color_rgb_hex(0x6495ed));
 
         gfx_shader_use(shader);
