@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.31)
 project(forge-of-titans)
 
+add_subdirectory("third_party/glad")
+
 file(GLOB_RECURSE SOURCE CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/*.c")
 add_executable(${CMAKE_PROJECT_NAME} ${SOURCE})
 
@@ -25,7 +27,7 @@ target_include_directories(${CMAKE_PROJECT_NAME}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/waddle/"
 )
 
-target_link_libraries(${CMAKE_PROJECT_NAME} glfw)
+target_link_libraries(${CMAKE_PROJECT_NAME} glfw glad)
 
 if (EMSCRIPTEN)
     execute_process(COMMAND emcc --cflags OUTPUT_VARIABLE EM_CFLAGS)
