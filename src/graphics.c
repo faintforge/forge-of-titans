@@ -5,7 +5,6 @@
 
 #include <glad/gl.h>
 
-#define FOR_LL(T, LIST, NAME) for (T* NAME = (LIST); NAME != NULL; NAME = NAME->next)
 #define ASSERT(EXPR, MSG, ...) do { \
     if (!(EXPR)) { \
         WDL_FATAL(MSG, ##__VA_ARGS__); \
@@ -14,110 +13,74 @@
 } while (0)
 
 // -- Internal structures ------------------------------------------------------
-// TODO: Find a way to abstract the pool structure to reduce duplicate code.
 
 //
-// Buffer pool
+// Resource pool
+// NOTE: Having the resource pool be generic makes it so type information is
+// lost. Using the wrong pool for the resource won't report as an error. Perhaps
+// there's some clever macro thing to solve this and make it more robust.
 //
 
-typedef struct BufferNode BufferNode;
-struct BufferNode {
-    BufferNode* next;
+typedef struct PoolNode PoolNode;
+struct PoolNode {
+    PoolNode* next;
+    void* data;
+};
+
+typedef struct ResourcePool ResourcePool;
+struct ResourcePool {
+    WDL_Arena* arena;
+    u32 resource_size;
+    PoolNode* nodes;
+};
+
+#define POOL_ITER(POOL, NAME) for (PoolNode* NAME = (POOL).nodes; NAME != NULL; NAME = NAME->next)
+
+static ResourcePool resource_pool_init(WDL_Arena* arena, u32 resource_size) {
+    ResourcePool pool = {
+        .arena = arena,
+        .resource_size = resource_size,
+    };
+    return pool;
+}
+
+static PoolNode* resource_pool_aquire(ResourcePool* pool) {
+    PoolNode* node = wdl_arena_push_no_zero(pool->arena, sizeof(PoolNode));
+    *node = (PoolNode) {
+        .data = wdl_arena_push(pool->arena, pool->resource_size),
+    };
+    return node;
+}
+
+static inline void* resource_pool_get_data(PoolNode* node) { return node->data; }
+
+// -- State --------------------------------------------------------------------
+
+typedef struct InternalBuffer InternalBuffer;
+struct InternalBuffer {
     u32 gl_handle;
     u64 size;
 };
 
-typedef struct BufferPool BufferPool;
-struct BufferPool {
-    WDL_Arena* arena;
-    BufferNode* nodes;
-};
-
-static BufferPool buffer_pool_init(WDL_Arena* arena) {
-    BufferPool buff_pool = {
-        .arena = arena,
-    };
-    return buff_pool;
-}
-
-static BufferNode* buffer_pool_get_handle(BufferPool* pool) {
-    BufferNode* node = wdl_arena_push_no_zero(pool->arena, sizeof(BufferNode));
-    node->next = pool->nodes;
-    pool->nodes = node;
-    glCreateBuffers(1, &node->gl_handle);
-    return node;
-}
-
-//
-// Vertex array pool
-//
-
-typedef struct VertexArrayNode VertexArrayNode;
-struct VertexArrayNode {
-    VertexArrayNode* next;
+typedef struct InternalVertexArray InternalVertexArray;
+struct InternalVertexArray {
     u32 gl_handle;
     GfxBuffer index_buffer;
 };
 
-typedef struct VertexArrayPool VertexArrayPool;
-struct VertexArrayPool {
-    WDL_Arena* arena;
-    VertexArrayNode* nodes;
-};
-
-static VertexArrayPool vertex_array_pool_init(WDL_Arena* arena) {
-    VertexArrayPool buff_pool = {
-        .arena = arena,
-    };
-    return buff_pool;
-}
-
-static VertexArrayNode* vertex_array_pool_get_handle(VertexArrayPool* pool) {
-    VertexArrayNode* node = wdl_arena_push_no_zero(pool->arena, sizeof(VertexArrayNode));
-    node->next = pool->nodes;
-    pool->nodes = node;
-    glCreateVertexArrays(1, &node->gl_handle);
-    return node;
-}
-
-//
-// Shader Pool
-//
-
-typedef struct ShaderNode ShaderNode;
-struct ShaderNode {
-    ShaderNode* next;
+typedef struct InternalShader InternalShader;
+struct InternalShader {
     u32 gl_handle;
 };
-
-typedef struct ShaderPool ShaderPool;
-struct ShaderPool {
-    WDL_Arena* arena;
-    ShaderNode* nodes;
-};
-
-static ShaderPool shader_pool_init(WDL_Arena* arena) {
-    ShaderPool buff_pool = {
-        .arena = arena,
-    };
-    return buff_pool;
-}
-
-static ShaderNode* shader_pool_get_handle(ShaderPool* pool) {
-    ShaderNode* node = wdl_arena_push_no_zero(pool->arena, sizeof(ShaderNode));
-    node->next = pool->nodes;
-    pool->nodes = node;
-    return node;
-}
 
 typedef struct GraphicsState GraphicsState;
 struct GraphicsState {
     WDL_Arena* arena;
     WDL_Lib* lib_gl;
 
-    BufferPool buffer_pool;
-    VertexArrayPool vertex_array_pool;
-    ShaderPool shader_pool;
+    ResourcePool buffer_pool;
+    ResourcePool vertex_array_pool;
+    ResourcePool shader_pool;
 };
 
 static GraphicsState state = {0};
@@ -128,9 +91,9 @@ b8 gfx_init(void) {
         .arena = arena,
         .lib_gl = wdl_lib_load(arena, "libGL.so"),
 
-        .buffer_pool = buffer_pool_init(arena),
-        .vertex_array_pool = vertex_array_pool_init(arena),
-        .shader_pool = shader_pool_init(arena),
+        .buffer_pool = resource_pool_init(arena, sizeof(InternalBuffer)),
+        .vertex_array_pool = resource_pool_init(arena, sizeof(InternalVertexArray)),
+        .shader_pool = resource_pool_init(arena, sizeof(InternalShader)),
     };
 
     if (!gladLoadGLUserPtr((GLADuserptrloadfunc) wdl_lib_func, state.lib_gl)) {
@@ -141,16 +104,19 @@ b8 gfx_init(void) {
 }
 
 void gfx_termiante(void) {
-    FOR_LL(BufferNode, state.buffer_pool.nodes, curr) {
-        glDeleteBuffers(1, &curr->gl_handle);
+    POOL_ITER(state.buffer_pool, node) {
+        InternalBuffer* buf = node->data;
+        glDeleteBuffers(1, &buf->gl_handle);
     }
 
-    FOR_LL(VertexArrayNode, state.vertex_array_pool.nodes, curr) {
-        glDeleteVertexArrays(1, &curr->gl_handle);
+    POOL_ITER(state.vertex_array_pool, node) {
+        InternalVertexArray* va = node->data;
+        glDeleteVertexArrays(1, &va->gl_handle);
     }
 
-    FOR_LL(ShaderNode, state.shader_pool.nodes, curr) {
-        glDeleteProgram(curr->gl_handle);
+    POOL_ITER(state.shader_pool, node) {
+        InternalShader* shader = node->data;
+        glDeleteProgram(shader->gl_handle);
     }
 
     wdl_lib_unload(state.lib_gl);
@@ -236,7 +202,9 @@ GfxColor gfx_color_hsv(f32 hue, f32 saturation, f32 value) {
 #define BUFFER_OP_TARGET GL_ARRAY_BUFFER
 
 GfxBuffer gfx_buffer_new(GfxBufferDesc desc) {
-    BufferNode* node = buffer_pool_get_handle(&state.buffer_pool);
+    PoolNode* node = resource_pool_aquire(&state.buffer_pool);
+    InternalBuffer* internal_buffer = node->data;
+    glGenBuffers(1, &internal_buffer->gl_handle);
     GfxBuffer buffer = { .handle = node };
     gfx_buffer_resize(buffer, desc);
     return buffer;
@@ -245,8 +213,8 @@ GfxBuffer gfx_buffer_new(GfxBufferDesc desc) {
 void gfx_buffer_resize(GfxBuffer buffer, GfxBufferDesc desc) {
     ASSERT(!gfx_buffer_is_null(buffer), "Cannot resize a NULL buffer!");
 
-    BufferNode* node = buffer.handle;
-    node->size = desc.size;
+    InternalBuffer* internal = resource_pool_get_data(buffer.handle);
+    internal->size = desc.size;
 
     GLenum gl_usage;
     switch (desc.usage) {
@@ -261,7 +229,7 @@ void gfx_buffer_resize(GfxBuffer buffer, GfxBufferDesc desc) {
             break;
     }
 
-    glBindBuffer(BUFFER_OP_TARGET, node->gl_handle);
+    glBindBuffer(BUFFER_OP_TARGET, internal->gl_handle);
     glBufferData(BUFFER_OP_TARGET, desc.size, desc.data, gl_usage);
     glBindBuffer(BUFFER_OP_TARGET, 0);
 }
@@ -269,10 +237,10 @@ void gfx_buffer_resize(GfxBuffer buffer, GfxBufferDesc desc) {
 void gfx_buffer_subdata(GfxBuffer buffer, const void* data, u32 size, u32 offset) {
     ASSERT(!gfx_buffer_is_null(buffer), "Cannot enter subdata into a NULL buffer!");
 
-    BufferNode* node = buffer.handle;
-    ASSERT(offset + size <= node->size, "Buffer overflow. Trying to write outside of the buffers capacity. Run 'gfx_buffer_resize()' to change the size.");
+    InternalBuffer* internal = resource_pool_get_data(buffer.handle);
+    ASSERT(offset + size <= internal->size, "Buffer overflow. Trying to write outside of the buffers capacity. Run 'gfx_buffer_resize()' to change the size.");
 
-    glBindBuffer(BUFFER_OP_TARGET, node->gl_handle);
+    glBindBuffer(BUFFER_OP_TARGET, internal->gl_handle);
     glBufferSubData(BUFFER_OP_TARGET, offset, size, data);
 }
 
@@ -285,11 +253,13 @@ b8 gfx_buffer_is_null(GfxBuffer buffer) {
 GfxVertexArray gfx_vertex_array_new(GfxVertexArrayDesc desc) {
     ASSERT(!gfx_buffer_is_null(desc.vertex_buffer), "Vertex array must have a vertex buffer!");
 
-    VertexArrayNode* node = vertex_array_pool_get_handle(&state.vertex_array_pool);
-    node->index_buffer = desc.index_buffer;
-    BufferNode* buf_node = desc.vertex_buffer.handle;
+    PoolNode* node = resource_pool_aquire(&state.vertex_array_pool);
+    InternalVertexArray* internal = node->data;
+    glGenVertexArrays(1, &internal->gl_handle);
+    internal->index_buffer = desc.index_buffer;
+    InternalBuffer* buf_node = resource_pool_get_data(desc.vertex_buffer.handle);
 
-    glBindVertexArray(node->gl_handle);
+    glBindVertexArray(internal->gl_handle);
     glBindBuffer(GL_ARRAY_BUFFER, buf_node->gl_handle);
 
     GfxVertexLayout layout = desc.layout;
@@ -352,15 +322,16 @@ GfxShader gfx_shader_new(WDL_Str vertex_source, WDL_Str fragment_source) {
     glDeleteShader(v_shader);
     glDeleteShader(f_shader);
 
-    ShaderNode* node = shader_pool_get_handle(&state.shader_pool);
-    node->gl_handle = program;
+    PoolNode* node = resource_pool_aquire(&state.shader_pool);
+    InternalShader* internal = node->data;
+    internal->gl_handle = program;
     return (GfxShader) { .handle = node };
 }
 
 void gfx_shader_use(GfxShader shader) {
     ASSERT(!gfx_shader_is_null(shader), "Can't use a NULL shader!");
-    ShaderNode* node = shader.handle;
-    glUseProgram(node->gl_handle);
+    InternalShader* internal = resource_pool_get_data(shader.handle);
+    glUseProgram(internal->gl_handle);
 }
 
 b8 gfx_shader_is_null(GfxShader shader) {
@@ -376,7 +347,7 @@ void gfx_clear(GfxColor color) {
 
 void gfx_draw(GfxVertexArray vertex_array, u32 vertex_count, u32 first_vertex) {
     ASSERT(!gfx_vertex_array_is_null(vertex_array), "No vertex buffer provided at draw!");
-    VertexArrayNode* node = vertex_array.handle;
+    InternalVertexArray* node = vertex_array.handle;
 
     glBindVertexArray(node->gl_handle);
     glDrawArrays(GL_TRIANGLES, first_vertex, vertex_count);
@@ -385,12 +356,12 @@ void gfx_draw(GfxVertexArray vertex_array, u32 vertex_count, u32 first_vertex) {
 
 void gfx_draw_indexed(GfxVertexArray vertex_array, u32 index_count, u32 first_index) {
     ASSERT(!gfx_vertex_array_is_null(vertex_array), "No vertex buffer provided at draw!");
-    VertexArrayNode* node = vertex_array.handle;
-    ASSERT(!gfx_buffer_is_null(node->index_buffer), "Can't draw indexed without an index buffer bound to vertex array!");
-    BufferNode* buf_node = node->index_buffer.handle;
+    InternalVertexArray* internal_va = resource_pool_get_data(vertex_array.handle);
+    ASSERT(!gfx_buffer_is_null(internal_va->index_buffer), "Can't draw indexed without an index buffer bound to vertex array!");
+    InternalBuffer* index_buffer = resource_pool_get_data(internal_va->index_buffer.handle);
 
-    glBindVertexArray(node->gl_handle);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, buf_node->gl_handle);
+    glBindVertexArray(internal_va->gl_handle);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer->gl_handle);
 
     glDrawElements(GL_TRIANGLES,
             index_count,
