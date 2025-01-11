@@ -80,6 +80,11 @@ struct InternalTexture {
     u32 height;
 };
 
+typedef struct InternalFramebuffer InternalFramebuffer;
+struct InternalFramebuffer {
+    u32 gl_handle;
+};
+
 typedef struct GraphicsState GraphicsState;
 struct GraphicsState {
     WDL_Arena* arena;
@@ -89,6 +94,7 @@ struct GraphicsState {
     ResourcePool vertex_array_pool;
     ResourcePool shader_pool;
     ResourcePool texture_pool;
+    ResourcePool framebuffer_pool;
 };
 
 static GraphicsState state = {0};
@@ -103,6 +109,7 @@ b8 gfx_init(void) {
         .vertex_array_pool = resource_pool_init(arena, sizeof(InternalVertexArray)),
         .shader_pool = resource_pool_init(arena, sizeof(InternalShader)),
         .texture_pool = resource_pool_init(arena, sizeof(InternalTexture)),
+        .framebuffer_pool = resource_pool_init(arena, sizeof(InternalFramebuffer)),
     };
 
     if (!gladLoadGLUserPtr((GLADuserptrloadfunc) wdl_lib_func, state.lib_gl)) {
@@ -482,6 +489,32 @@ void gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc) {
             desc.data);
 
     glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+// -- Framebuffer --------------------------------------------------------------
+
+GfxFramebuffer gfx_framebuffer_new(void) {
+    PoolNode* node = resource_pool_aquire(&state.framebuffer_pool);
+    InternalFramebuffer* internal = node->data;
+    glGenFramebuffers(1, &internal->gl_handle);
+    return (GfxFramebuffer) { .handle = node };
+}
+
+void gfx_framebuffer_attach(GfxFramebuffer framebuffer, GfxTexture texture, u32 slot) {
+    InternalFramebuffer* internal = resource_pool_get_data(framebuffer.handle);
+    glBindFramebuffer(GL_FRAMEBUFFER, internal->gl_handle);
+    InternalTexture* internal_texture = resource_pool_get_data(texture.handle);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + slot, GL_TEXTURE_2D, internal_texture->gl_handle, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void gfx_framebuffer_bind(GfxFramebuffer framebuffer) {
+    InternalFramebuffer* internal = resource_pool_get_data(framebuffer.handle);
+    glBindFramebuffer(GL_FRAMEBUFFER, internal->gl_handle);
+}
+
+void gfx_framebuffer_unbind(void) {
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 // -- Drawing ------------------------------------------------------------------

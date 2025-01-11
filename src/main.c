@@ -113,22 +113,24 @@ i32 main(void) {
     GfxShader shader = gfx_shader_new(vertex_source, fragment_source);
     wdl_scratch_end(scratch);
 
-    GfxTexture texture = gfx_texture_new((GfxTextureDesc) {
-            .data = (u8[]) {
-                255, 0, 0,
-                0, 255, 0,
-                // Padding
-                0, 0,
-                0, 0, 255,
-                255, 0, 255,
-                // Padding
-                0, 0,
-            },
-            .width = 2,
-            .height = 2,
+    GfxTexture white = gfx_texture_new((GfxTextureDesc) {
+            .data = (u8[]) {255, 255, 255},
+            .width = 1,
+            .height = 1,
             .format = GFX_TEXTURE_FORMAT_RGB_U8,
             .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
         });
+
+    GfxTexture texture = gfx_texture_new((GfxTextureDesc) {
+            .data = NULL,
+            .width = 1280,
+            .height = 720,
+            .format = GFX_TEXTURE_FORMAT_RGB_U8,
+            .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
+        });
+
+    GfxFramebuffer fb = gfx_framebuffer_new();
+    gfx_framebuffer_attach(fb, texture, 0);
 
     // -------------------------------------------------------------------------
 
@@ -149,11 +151,12 @@ i32 main(void) {
             fps = 0;
         }
 
+        gfx_framebuffer_bind(fb);
         gfx_clear(gfx_color_rgb_hex(0x6495ed));
-
-        gfx_texture_bind(texture, 0);
+        gfx_texture_bind(white, 0);
         gfx_shader_use(shader);
         gfx_draw_indexed(vertex_array, 6, 0);
+        gfx_framebuffer_unbind();
 
         window_swap_buffers(window);
         window_poll_events();

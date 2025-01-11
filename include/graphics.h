@@ -148,6 +148,18 @@ extern GfxTexture gfx_texture_new(GfxTextureDesc desc);
 extern void       gfx_texture_bind(GfxTexture texture, u32 slot);
 extern void       gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc);
 
+// -- Framebuffer --------------------------------------------------------------
+
+typedef struct GfxFramebuffer GfxFramebuffer;
+struct GfxFramebuffer {
+    void* handle;
+};
+
+extern GfxFramebuffer gfx_framebuffer_new(void);
+extern void           gfx_framebuffer_attach(GfxFramebuffer framebuffer, GfxTexture texture, u32 slot);
+extern void           gfx_framebuffer_bind(GfxFramebuffer framebuffer);
+extern void           gfx_framebuffer_unbind(void);
+
 // -- Drawing ------------------------------------------------------------------
 
 extern void gfx_clear(GfxColor color);
