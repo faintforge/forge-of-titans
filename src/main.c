@@ -59,13 +59,14 @@ i32 main(void) {
     typedef struct Vertex Vertex;
     struct Vertex {
         f32 pos[2];
+        f32 uv[2];
         GfxColor color;
     };
     Vertex vertices[] = {
-        { {-0.5f, -0.5f}, GFX_COLOR_RED },
-        { { 0.5f, -0.5f}, GFX_COLOR_BLUE },
-        { {-0.5f,  0.5f}, GFX_COLOR_GREEN },
-        { { 0.5f,  0.5f}, gfx_color_rgb_hex(0xff00ff) },
+        { {-0.5f, -0.5f}, {0.0f, 0.0f}, GFX_COLOR_WHITE },
+        { { 0.5f, -0.5f}, {1.0f, 0.0f}, GFX_COLOR_WHITE },
+        { {-0.5f,  0.5f}, {0.0f, 1.0f}, GFX_COLOR_WHITE },
+        { { 0.5f,  0.5f}, {1.0f, 1.0f}, GFX_COLOR_WHITE },
     };
     GfxBuffer vertex_buffer = gfx_buffer_new((GfxBufferDesc) {
             .size = sizeof(vertices),
@@ -92,11 +93,15 @@ i32 main(void) {
                         .offset = WDL_OFFSET(Vertex, pos),
                     },
                     [1] = {
+                        .count = 2,
+                        .offset = WDL_OFFSET(Vertex, uv),
+                    },
+                    [2] = {
                         .count = 4,
                         .offset = WDL_OFFSET(Vertex, color),
                     },
                 },
-                .attrib_count = 2,
+                .attrib_count = 3,
             },
             .vertex_buffer = vertex_buffer,
             .index_buffer = index_buffer
@@ -107,6 +112,23 @@ i32 main(void) {
     WDL_Str fragment_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/frag.glsl"));
     GfxShader shader = gfx_shader_new(vertex_source, fragment_source);
     wdl_scratch_end(scratch);
+
+    GfxTexture texture = gfx_texture_new((GfxTextureDesc) {
+            .data = (u8[]) {
+                255, 0, 0,
+                0, 255, 0,
+                // Padding
+                0, 0,
+                0, 0, 255,
+                255, 0, 255,
+                // Padding
+                0, 0,
+            },
+            .width = 2,
+            .height = 2,
+            .format = GFX_TEXTURE_FORMAT_RGB_U8,
+            .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
+        });
 
     // -------------------------------------------------------------------------
 
@@ -129,6 +151,7 @@ i32 main(void) {
 
         gfx_clear(gfx_color_rgb_hex(0x6495ed));
 
+        gfx_texture_bind(texture, 0);
         gfx_shader_use(shader);
         gfx_draw_indexed(vertex_array, 6, 0);
 

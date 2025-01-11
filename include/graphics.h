@@ -104,6 +104,50 @@ extern GfxShader gfx_shader_new(WDL_Str vertex_source, WDL_Str fragment_source);
 extern void      gfx_shader_use(GfxShader shader);
 extern b8        gfx_shader_is_null(GfxShader shader);
 
+// -- Texture ------------------------------------------------------------------
+
+typedef struct GfxTexture GfxTexture;
+struct GfxTexture {
+    void* handle;
+};
+
+typedef enum GfxTextureFormat {
+    // Each pixel row needs to be a multiple of 4 so a 2x2 RGB_U8 texture needs
+    // to pad each row of 6 pixels with 2 extra bytes.
+    GFX_TEXTURE_FORMAT_R_U8 = 1,
+    GFX_TEXTURE_FORMAT_RG_U8,
+    GFX_TEXTURE_FORMAT_RGB_U8,
+    GFX_TEXTURE_FORMAT_RGBA_U8,
+
+    GFX_TEXTURE_FORMAT_R_F16,
+    GFX_TEXTURE_FORMAT_RG_F16,
+    GFX_TEXTURE_FORMAT_RGB_F16,
+    GFX_TEXTURE_FORMAT_RGBA_F16,
+
+    GFX_TEXTURE_FORMAT_R_F32,
+    GFX_TEXTURE_FORMAT_RG_F32,
+    GFX_TEXTURE_FORMAT_RGB_F32,
+    GFX_TEXTURE_FORMAT_RGBA_F32,
+} GfxTextureFormat;
+
+typedef enum GfxTextureSampler {
+    GFX_TEXTURE_SAMPLER_LINEAR,
+    GFX_TEXTURE_SAMPLER_NEAREST,
+} GfxTextureSampler;
+
+typedef struct GfxTextureDesc GfxTextureDesc;
+struct GfxTextureDesc {
+    const void* data;
+    u32 width;
+    u32 height;
+    GfxTextureFormat format;
+    GfxTextureSampler sampler;
+};
+
+extern GfxTexture gfx_texture_new(GfxTextureDesc desc);
+extern void       gfx_texture_bind(GfxTexture texture, u32 slot);
+extern void       gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc);
+
 // -- Drawing ------------------------------------------------------------------
 
 extern void gfx_clear(GfxColor color);

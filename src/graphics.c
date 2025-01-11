@@ -73,6 +73,13 @@ struct InternalShader {
     u32 gl_handle;
 };
 
+typedef struct InternalTexture InternalTexture;
+struct InternalTexture {
+    u32 gl_handle;
+    u32 width;
+    u32 height;
+};
+
 typedef struct GraphicsState GraphicsState;
 struct GraphicsState {
     WDL_Arena* arena;
@@ -81,6 +88,7 @@ struct GraphicsState {
     ResourcePool buffer_pool;
     ResourcePool vertex_array_pool;
     ResourcePool shader_pool;
+    ResourcePool texture_pool;
 };
 
 static GraphicsState state = {0};
@@ -94,6 +102,7 @@ b8 gfx_init(void) {
         .buffer_pool = resource_pool_init(arena, sizeof(InternalBuffer)),
         .vertex_array_pool = resource_pool_init(arena, sizeof(InternalVertexArray)),
         .shader_pool = resource_pool_init(arena, sizeof(InternalShader)),
+        .texture_pool = resource_pool_init(arena, sizeof(InternalTexture)),
     };
 
     if (!gladLoadGLUserPtr((GLADuserptrloadfunc) wdl_lib_func, state.lib_gl)) {
@@ -117,6 +126,11 @@ void gfx_termiante(void) {
     POOL_ITER(state.shader_pool, node) {
         InternalShader* shader = node->data;
         glDeleteProgram(shader->gl_handle);
+    }
+
+    POOL_ITER(state.texture_pool, node) {
+        InternalTexture* texture = node->data;
+        glDeleteTextures(1, &texture->gl_handle);
     }
 
     wdl_lib_unload(state.lib_gl);
@@ -336,6 +350,138 @@ void gfx_shader_use(GfxShader shader) {
 
 b8 gfx_shader_is_null(GfxShader shader) {
     return shader.handle == NULL;
+}
+
+// -- Texture ------------------------------------------------------------------
+
+GfxTexture gfx_texture_new(GfxTextureDesc desc) {
+    PoolNode* node = resource_pool_aquire(&state.texture_pool);
+    InternalTexture* internal = node->data;
+    glGenTextures(1, &internal->gl_handle);
+    GfxTexture texture = { .handle = node };
+    gfx_texture_resize(texture, desc);
+    return texture;
+}
+
+void gfx_texture_bind(GfxTexture texture, u32 slot) {
+    InternalTexture* internal = resource_pool_get_data(texture.handle);
+    glBindTextureUnit(slot, internal->gl_handle);
+}
+
+void gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc) {
+    InternalTexture* internal = resource_pool_get_data(texture.handle);
+
+    internal->width = desc.width;
+    internal->height = desc.height;
+
+    u32 gl_internal_format;
+    u32 gl_format;
+    switch (desc.format) {
+        case GFX_TEXTURE_FORMAT_R_U8:
+            gl_internal_format = GL_R8;
+            gl_format = GL_RED;
+            break;
+        case GFX_TEXTURE_FORMAT_RG_U8:
+            gl_internal_format = GL_RG8;
+            gl_format = GL_RG;
+            break;
+        case GFX_TEXTURE_FORMAT_RGB_U8:
+            gl_internal_format = GL_RGB8;
+            gl_format = GL_RGB;
+            break;
+        case GFX_TEXTURE_FORMAT_RGBA_U8:
+            gl_internal_format = GL_RGBA8;
+            gl_format = GL_RGBA;
+            break;
+
+        case GFX_TEXTURE_FORMAT_R_F16:
+            gl_internal_format = GL_R16F;
+            gl_format = GL_RED;
+            break;
+        case GFX_TEXTURE_FORMAT_RG_F16:
+            gl_internal_format = GL_RG16F;
+            gl_format = GL_RG;
+            break;
+        case GFX_TEXTURE_FORMAT_RGB_F16:
+            gl_internal_format = GL_RGB16F;
+            gl_format = GL_RGB;
+            break;
+        case GFX_TEXTURE_FORMAT_RGBA_F16:
+            gl_internal_format = GL_RGBA16F;
+            gl_format = GL_RGBA;
+            break;
+
+        case GFX_TEXTURE_FORMAT_R_F32:
+            gl_internal_format = GL_R32F;
+            gl_format = GL_RED;
+            break;
+        case GFX_TEXTURE_FORMAT_RG_F32:
+            gl_internal_format = GL_RG32F;
+            gl_format = GL_RG;
+            break;
+        case GFX_TEXTURE_FORMAT_RGB_F32:
+            gl_internal_format = GL_RGB32F;
+            gl_format = GL_RGB;
+            break;
+        case GFX_TEXTURE_FORMAT_RGBA_F32:
+            gl_internal_format = GL_RGBA32F;
+            gl_format = GL_RGBA;
+            break;
+    }
+
+    u32 gl_type;
+    switch (desc.format) {
+        case GFX_TEXTURE_FORMAT_R_U8:
+        case GFX_TEXTURE_FORMAT_RG_U8:
+        case GFX_TEXTURE_FORMAT_RGB_U8:
+        case GFX_TEXTURE_FORMAT_RGBA_U8:
+            gl_type = GL_UNSIGNED_BYTE;
+            break;
+
+        case GFX_TEXTURE_FORMAT_R_F16:
+        case GFX_TEXTURE_FORMAT_RG_F16:
+        case GFX_TEXTURE_FORMAT_RGB_F16:
+        case GFX_TEXTURE_FORMAT_RGBA_F16:
+            gl_type = GL_HALF_FLOAT;
+            break;
+
+        case GFX_TEXTURE_FORMAT_R_F32:
+        case GFX_TEXTURE_FORMAT_RG_F32:
+        case GFX_TEXTURE_FORMAT_RGB_F32:
+        case GFX_TEXTURE_FORMAT_RGBA_F32:
+            gl_type = GL_FLOAT;
+            break;
+    }
+
+    u32 gl_sampler;
+    switch (desc.sampler) {
+        case GFX_TEXTURE_SAMPLER_LINEAR:
+            gl_sampler = GL_LINEAR;
+            break;
+        case GFX_TEXTURE_SAMPLER_NEAREST:
+            gl_sampler = GL_NEAREST;
+            break;
+    }
+
+    glBindTexture(GL_TEXTURE_2D, internal->gl_handle);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, gl_sampler);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, gl_sampler);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+
+    glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            gl_internal_format,
+            desc.width,
+            desc.height,
+            0,
+            gl_format,
+            gl_type,
+            desc.data);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 // -- Drawing ------------------------------------------------------------------
