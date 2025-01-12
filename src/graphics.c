@@ -76,8 +76,7 @@ struct InternalShader {
 typedef struct InternalTexture InternalTexture;
 struct InternalTexture {
     u32 gl_handle;
-    u32 width;
-    u32 height;
+    WDL_Ivec2 size;
 };
 
 typedef struct InternalFramebuffer InternalFramebuffer;
@@ -378,8 +377,7 @@ void gfx_texture_bind(GfxTexture texture, u32 slot) {
 void gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc) {
     InternalTexture* internal = resource_pool_get_data(texture.handle);
 
-    internal->width = desc.width;
-    internal->height = desc.height;
+    internal->size = desc.size;
 
     u32 gl_internal_format;
     u32 gl_format;
@@ -481,8 +479,8 @@ void gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc) {
             GL_TEXTURE_2D,
             0,
             gl_internal_format,
-            desc.width,
-            desc.height,
+            desc.size.x,
+            desc.size.y,
             0,
             gl_format,
             gl_type,
@@ -551,6 +549,6 @@ void gfx_draw_indexed(GfxVertexArray vertex_array, u32 index_count, u32 first_in
     glBindVertexArray(0);
 }
 
-void gfx_viewport(u32 width, u32 height) {
-    glViewport(0, 0, width, height);
+void gfx_viewport(WDL_Ivec2 size) {
+    glViewport(0, 0, size.x, size.y);
 }

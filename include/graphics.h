@@ -138,8 +138,7 @@ typedef enum GfxTextureSampler {
 typedef struct GfxTextureDesc GfxTextureDesc;
 struct GfxTextureDesc {
     const void* data;
-    u32 width;
-    u32 height;
+    WDL_Ivec2 size;
     GfxTextureFormat format;
     GfxTextureSampler sampler;
 };
@@ -165,6 +164,6 @@ extern void           gfx_framebuffer_unbind(void);
 extern void gfx_clear(GfxColor color);
 extern void gfx_draw(GfxVertexArray vertex_array, u32 vertex_count, u32 first_vertex);
 extern void gfx_draw_indexed(GfxVertexArray vertex_array, u32 index_count, u32 first_index);
-extern void gfx_viewport(u32 width, u32 height);
+extern void gfx_viewport(WDL_Ivec2 size);
 
 #endif // GRAPHICS_H

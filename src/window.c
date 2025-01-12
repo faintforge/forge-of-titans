@@ -6,8 +6,7 @@
 struct Window {
     GLFWwindow* handle;
     b8 is_open;
-    u32 width;
-    u32 height;
+    WDL_Ivec2 size;
     b8 vsync;
 
     ResizeCallback resize_cb;
@@ -20,10 +19,9 @@ static void close_cb(GLFWwindow* handle) {
 
 static void internal_resize_cb(GLFWwindow* handle, i32 width, i32 height) {
     Window* window = glfwGetWindowUserPointer(handle);
-    window->width = width;
-    window->height = height;
+    window->size = wdl_iv2(width, height);
     if (window->resize_cb != NULL) {
-        window->resize_cb(window, width, height);
+        window->resize_cb(window, window->size);
     }
 }
 
@@ -39,14 +37,13 @@ Window* window_create(WDL_Arena* arena, WindowDesc desc) {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_RESIZABLE, desc.resizable);
     *window = (Window) {
-        .handle = glfwCreateWindow(desc.width,
-                desc.height,
+        .handle = glfwCreateWindow(desc.size.x,
+                desc.size.y,
                 desc.title,
                 NULL,
                 NULL),
         .is_open = true,
-        .width = desc.width,
-        .height = desc.height,
+        .size = desc.size,
         .vsync = desc.vsync,
         .resize_cb = desc.resize_cb,
     };

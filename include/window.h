@@ -5,12 +5,11 @@
 
 typedef struct Window Window;
 
-typedef void (*ResizeCallback)(Window* window, u32 width, u32 height);
+typedef void (*ResizeCallback)(Window* window, WDL_Ivec2 size);
 
 typedef struct WindowDesc WindowDesc;
 struct WindowDesc {
-    u32 width;
-    u32 height;
+    WDL_Ivec2 size;
     const char* title;
     b8 resizable;
     b8 vsync;

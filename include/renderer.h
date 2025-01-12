@@ -15,10 +15,7 @@ struct RenderPassDesc {
     void (*resize)(RenderPass* pass);
     b8 screen_size_dependant;
 
-    struct {
-        u32 width;
-        u32 height;
-    } viewport;
+    WDL_Ivec2 viewport;
 
     // If there's no targets specificed then it's assumed the pass is targeting
     // the swapchain.

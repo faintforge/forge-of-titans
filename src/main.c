@@ -88,9 +88,9 @@ void fullscreen_quad_draw(FullscreenQuad fsq) {
     gfx_draw_indexed(fsq.vertex_array, 6, 0);
 }
 
-static void resize_cb(Window* window, u32 width, u32 height) {
+static void resize_cb(Window* window, WDL_Ivec2 size) {
     (void) window;
-    WDL_INFO("Resize: %ux%u", width, height);
+    WDL_INFO("Resize: %ux%u", size.x, size.y);
 }
 
 typedef struct GeometryInfo GeometryInfo;
@@ -126,11 +126,10 @@ i32 main(void) {
 
     Window* window = window_create(arena, (WindowDesc) {
             .title = "Forge of Titans",
-            .width = 1280,
-            .height = 720,
+            .size = wdl_iv2(1280, 720),
             .resize_cb = resize_cb,
             .resizable = false,
-            .vsync = true,
+            .vsync = false,
         });
     if (window == NULL) {
         WDL_ERROR("Window creation failed!");
@@ -216,16 +215,14 @@ i32 main(void) {
 
     GfxTexture white = gfx_texture_new((GfxTextureDesc) {
             .data = (u8[]) {255, 255, 255},
-            .width = 1,
-            .height = 1,
+            .size = wdl_iv2s(1),
             .format = GFX_TEXTURE_FORMAT_RGB_U8,
             .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
         });
 
     GfxTexture texture = gfx_texture_new((GfxTextureDesc) {
             .data = NULL,
-            .width = 160,
-            .height = 85,
+            .size = wdl_iv2(160, 85),
             .format = GFX_TEXTURE_FORMAT_RGB_U8,
             .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
         });
@@ -244,10 +241,8 @@ i32 main(void) {
             .resize = NULL,
             .screen_size_dependant = false,
 
-            .viewport = {
-                .width = 160,
-                .height = 85,
-            },
+            .viewport = wdl_iv2(160, 85),
+
             .targets = {texture},
             .target_count = 1,
 
@@ -262,10 +257,7 @@ i32 main(void) {
             .inputs = {texture},
             .input_count = 1,
 
-            .viewport = {
-                .width = 1280,
-                .height = 720,
-            },
+            .viewport = wdl_iv2(1280, 720),
         });
 
     RenderPipeline pipeline = {0};

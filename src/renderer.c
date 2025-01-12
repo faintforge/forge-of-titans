@@ -24,7 +24,7 @@ RenderPass render_pass_new(RenderPassDesc desc) {
 
 void render_pass_execute(RenderPass pass) {
     RenderPassDesc desc = pass.desc;
-    gfx_viewport(desc.viewport.width, desc.viewport.height);
+    gfx_viewport(desc.viewport);
 
     if (!pass.targets_swapchain) {
         gfx_framebuffer_bind(pass.fb);
