@@ -4,25 +4,11 @@
 #include "window.h"
 #include "graphics.h"
 #include "renderer.h"
+#include "utils.h"
 
-static WDL_Str read_file(WDL_Arena* arena, WDL_Str filename) {
-    const char* cstr_filename = wdl_str_to_cstr(arena, filename);
-    FILE *fp = fopen(cstr_filename, "rb");
-    // Pop off the cstr_filename from the arena since it's no longer needed.
-    wdl_arena_pop(arena, filename.len + 1);
-    if (fp == NULL) {
-        WDL_ERROR("Failed to open file '%.*s'.\n", filename.len, filename.data);
-        return (WDL_Str) {0};
-    }
-
-    fseek(fp, 0, SEEK_END);
-    u32 len = ftell(fp);
-    fseek(fp, 0, SEEK_SET);
-    u8* content = wdl_arena_push(arena, len);
-    fread(content, sizeof(u8), len, fp);
-
-    return wdl_str(content, len);
-}
+static Camera camera = {
+    .zoom = 5.0f,
+};
 
 typedef struct FullscreenQuad FullscreenQuad;
 struct FullscreenQuad {
@@ -93,23 +79,23 @@ static void resize_cb(Window* window, WDL_Ivec2 size) {
     WDL_INFO("Resize: %ux%u", size.x, size.y);
 }
 
-typedef struct GeometryInfo GeometryInfo;
-struct GeometryInfo {
-    GfxTexture white;
-    GfxShader shader;
-    GfxVertexArray vertex_array;
-};
-
 static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void* user_data) {
     (void) inputs;
     (void) input_count;
 
-    GeometryInfo* info = user_data;
+    BatchRenderer* br = user_data;
 
-    gfx_clear(gfx_color_rgb_hex(0x6495ed));
-    gfx_texture_bind(info->white, 0);
-    gfx_shader_use(info->shader);
-    gfx_draw_indexed(info->vertex_array, 6, 0);
+    gfx_clear(GFX_COLOR_BLACK);
+    batch_begin(br);
+
+    draw_quad(br, (Quad) {
+            .pos = wdl_v2s(0.0f),
+            .size = wdl_v2s(1.0f),
+            .rotation = wdl_os_get_time(),
+            .color = gfx_color_hsv(wdl_os_get_time() * 90.0f, 0.75f, 1.0f),
+        }, camera);
+
+    batch_end(br);
 }
 
 static void blit_pass_execute(const GfxTexture* inputs, u8 input_count, void* user_data) {
@@ -126,7 +112,7 @@ i32 main(void) {
 
     Window* window = window_create(arena, (WindowDesc) {
             .title = "Forge of Titans",
-            .size = wdl_iv2(1280, 720),
+            .size = wdl_iv2(800, 600),
             .resize_cb = resize_cb,
             .resizable = false,
             .vsync = false,
@@ -152,97 +138,25 @@ i32 main(void) {
 
     // -------------------------------------------------------------------------
 
-    typedef struct Vertex Vertex;
-    struct Vertex {
-        f32 pos[2];
-        f32 uv[2];
-        GfxColor color;
-    };
-    Vertex vertices[] = {
-        // { {-0.5f, -0.5f}, {0.0f, 0.0f}, GFX_COLOR_WHITE },
-        // { { 0.5f, -0.5f}, {1.0f, 0.0f}, GFX_COLOR_WHITE },
-        // { {-0.5f,  0.5f}, {0.0f, 1.0f}, GFX_COLOR_WHITE },
-        // { { 0.5f,  0.5f}, {1.0f, 1.0f}, GFX_COLOR_WHITE },
-
-        { {-0.5f, -0.5f}, {0.0f, 0.0f}, GFX_COLOR_RED, },
-        { { 0.5f, -0.5f}, {1.0f, 0.0f}, GFX_COLOR_BLUE, },
-        { { 0.0f,  0.5f}, {0.5f, 1.0f}, GFX_COLOR_GREEN, },
-    };
-    GfxBuffer vertex_buffer = gfx_buffer_new((GfxBufferDesc) {
-            .size = sizeof(vertices),
-            .data = vertices,
-            .usage = GFX_BUFFER_USAGE_STATIC,
-        });
-
-    u32 indices[] = {
-        0, 1, 2,
-        // 2, 3, 1,
-    };
-    GfxBuffer index_buffer = gfx_buffer_new((GfxBufferDesc) {
-            .size = sizeof(indices),
-            .data = indices,
-            .usage = GFX_BUFFER_USAGE_STATIC,
-        });
-
-    GfxVertexArray vertex_array = gfx_vertex_array_new((GfxVertexArrayDesc) {
-            .layout = {
-                .size = sizeof(Vertex),
-                .attribs = {
-                    [0] = {
-                        .count = 2,
-                        .offset = WDL_OFFSET(Vertex, pos),
-                    },
-                    [1] = {
-                        .count = 2,
-                        .offset = WDL_OFFSET(Vertex, uv),
-                    },
-                    [2] = {
-                        .count = 4,
-                        .offset = WDL_OFFSET(Vertex, color),
-                    },
-                },
-                .attrib_count = 3,
-            },
-            .vertex_buffer = vertex_buffer,
-            .index_buffer = index_buffer
-        });
-
-    WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
-    WDL_Str vertex_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/vert.glsl"));
-    WDL_Str fragment_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/frag.glsl"));
-    GfxShader shader = gfx_shader_new(vertex_source, fragment_source);
-    wdl_scratch_end(scratch);
-
-    GfxTexture white = gfx_texture_new((GfxTextureDesc) {
-            .data = (u8[]) {255, 255, 255},
-            .size = wdl_iv2s(1),
-            .format = GFX_TEXTURE_FORMAT_RGB_U8,
-            .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
-        });
-
-    GfxTexture texture = gfx_texture_new((GfxTextureDesc) {
-            .data = NULL,
-            .size = wdl_iv2(160, 85),
-            .format = GFX_TEXTURE_FORMAT_RGB_U8,
-            .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
-        });
+    BatchRenderer br = batch_renderer_new(arena, 4096);
 
     // -------------------------------------------------------------------------
 
-    GeometryInfo info = {
-        .white = white,
-        .shader = shader,
-        .vertex_array = vertex_array,
-    };
+    GfxTexture texture = gfx_texture_new((GfxTextureDesc) {
+            .data = NULL,
+            .size = wdl_iv2_divs(window_get_size(window), 1),
+            .format = GFX_TEXTURE_FORMAT_RGB_U8,
+            .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
+        });
+
     RenderPass geometry_pass = render_pass_new((RenderPassDesc) {
             .execute = geometry_pass_execute,
-            .user_data = &info,
+            .user_data = &br,
 
             .resize = NULL,
             .screen_size_dependant = false,
 
-            .viewport = wdl_iv2(160, 85),
-
+            .viewport = gfx_texture_get_size(texture),
             .targets = {texture},
             .target_count = 1,
 
@@ -257,7 +171,7 @@ i32 main(void) {
             .inputs = {texture},
             .input_count = 1,
 
-            .viewport = wdl_iv2(1280, 720),
+            .viewport = window_get_size(window),
         });
 
     RenderPipeline pipeline = {0};
@@ -283,6 +197,7 @@ i32 main(void) {
             fps = 0;
         }
 
+        camera.screen_size = window_get_size(window);
         render_pipeline_execute(&pipeline);
 
         window_swap_buffers(window);

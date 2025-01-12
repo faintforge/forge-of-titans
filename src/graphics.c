@@ -489,6 +489,11 @@ void gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc) {
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 
+WDL_Ivec2 gfx_texture_get_size(GfxTexture texture) {
+    InternalTexture* internal = resource_pool_get_data(texture.handle);
+    return internal->size;
+}
+
 // -- Framebuffer --------------------------------------------------------------
 
 GfxFramebuffer gfx_framebuffer_new(void) {

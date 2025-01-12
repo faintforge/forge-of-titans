@@ -146,6 +146,7 @@ struct GfxTextureDesc {
 extern GfxTexture gfx_texture_new(GfxTextureDesc desc);
 extern void       gfx_texture_bind(GfxTexture texture, u32 slot);
 extern void       gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc);
+extern WDL_Ivec2  gfx_texture_get_size(GfxTexture texture);
 
 // -- Framebuffer --------------------------------------------------------------
 

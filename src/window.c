@@ -78,3 +78,7 @@ void window_swap_buffers(Window* window) {
 void window_make_current(Window* window) {
     glfwMakeContextCurrent(window->handle);
 }
+
+WDL_Ivec2 window_get_size(const Window* window) {
+    return window->size;
+}

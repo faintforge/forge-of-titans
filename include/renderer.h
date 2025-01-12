@@ -46,4 +46,49 @@ struct RenderPipeline {
 extern void render_pipeline_add_pass(RenderPipeline* pipeline, RenderPass pass);
 extern void render_pipeline_execute(const RenderPipeline* pipeline);
 
+// -- Camera -------------------------------------------------------------------
+
+typedef struct Camera Camera;
+struct Camera {
+    WDL_Ivec2 screen_size;
+    WDL_Vec2 pos;
+    f32 zoom;
+};
+
+extern WDL_Mat4 camera_proj(Camera cam);
+extern WDL_Mat4 camera_proj_inv(Camera cam);
+
+// -- Batch renderer -----------------------------------------------------------
+
+typedef struct Vertex Vertex;
+struct Vertex {
+    WDL_Vec2 pos;
+    WDL_Vec2 uv;
+    GfxColor color;
+};
+
+typedef struct BatchRenderer BatchRenderer;
+struct BatchRenderer {
+    u32 max_quad_count;
+    u32 curr_quad;
+
+    Vertex* vertices;
+    GfxBuffer vertex_buffer;
+    GfxVertexArray vertex_array;
+    GfxShader shader;
+};
+
+typedef struct Quad Quad;
+struct Quad {
+    WDL_Vec2 pos;
+    WDL_Vec2 size;
+    f32 rotation;
+    GfxColor color;
+};
+
+extern BatchRenderer batch_renderer_new(WDL_Arena* arena, u32 max_quad_count);
+extern void batch_begin(BatchRenderer* br);
+extern void batch_end(BatchRenderer* br);
+extern void draw_quad(BatchRenderer* br, Quad quad, Camera cam);
+
 #endif // RENDERER_H
