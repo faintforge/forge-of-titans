@@ -100,7 +100,7 @@ struct GeometryInfo {
     GfxVertexArray vertex_array;
 };
 
-static void geometry_pass_run(const GfxTexture* inputs, u8 input_count, void* user_data) {
+static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void* user_data) {
     (void) inputs;
     (void) input_count;
 
@@ -112,7 +112,7 @@ static void geometry_pass_run(const GfxTexture* inputs, u8 input_count, void* us
     gfx_draw_indexed(info->vertex_array, 6, 0);
 }
 
-static void blit_pass_run(const GfxTexture* inputs, u8 input_count, void* user_data) {
+static void blit_pass_execute(const GfxTexture* inputs, u8 input_count, void* user_data) {
     for (u8 i = 0; i < input_count; i++) {
         gfx_texture_bind(inputs[i], i);
     }
@@ -160,10 +160,14 @@ i32 main(void) {
         GfxColor color;
     };
     Vertex vertices[] = {
-        { {-0.5f, -0.5f}, {0.0f, 0.0f}, GFX_COLOR_WHITE },
-        { { 0.5f, -0.5f}, {1.0f, 0.0f}, GFX_COLOR_WHITE },
-        { {-0.5f,  0.5f}, {0.0f, 1.0f}, GFX_COLOR_WHITE },
-        { { 0.5f,  0.5f}, {1.0f, 1.0f}, GFX_COLOR_WHITE },
+        // { {-0.5f, -0.5f}, {0.0f, 0.0f}, GFX_COLOR_WHITE },
+        // { { 0.5f, -0.5f}, {1.0f, 0.0f}, GFX_COLOR_WHITE },
+        // { {-0.5f,  0.5f}, {0.0f, 1.0f}, GFX_COLOR_WHITE },
+        // { { 0.5f,  0.5f}, {1.0f, 1.0f}, GFX_COLOR_WHITE },
+
+        { {-0.5f, -0.5f}, {0.0f, 0.0f}, GFX_COLOR_RED, },
+        { { 0.5f, -0.5f}, {1.0f, 0.0f}, GFX_COLOR_BLUE, },
+        { { 0.0f,  0.5f}, {0.5f, 1.0f}, GFX_COLOR_GREEN, },
     };
     GfxBuffer vertex_buffer = gfx_buffer_new((GfxBufferDesc) {
             .size = sizeof(vertices),
@@ -173,7 +177,7 @@ i32 main(void) {
 
     u32 indices[] = {
         0, 1, 2,
-        2, 3, 1,
+        // 2, 3, 1,
     };
     GfxBuffer index_buffer = gfx_buffer_new((GfxBufferDesc) {
             .size = sizeof(indices),
@@ -220,8 +224,8 @@ i32 main(void) {
 
     GfxTexture texture = gfx_texture_new((GfxTextureDesc) {
             .data = NULL,
-            .width = 1280,
-            .height = 720,
+            .width = 160,
+            .height = 85,
             .format = GFX_TEXTURE_FORMAT_RGB_U8,
             .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
         });
@@ -234,12 +238,16 @@ i32 main(void) {
         .vertex_array = vertex_array,
     };
     RenderPass geometry_pass = render_pass_new((RenderPassDesc) {
-            .run = geometry_pass_run,
+            .execute = geometry_pass_execute,
             .user_data = &info,
 
             .resize = NULL,
             .screen_size_dependant = false,
 
+            .viewport = {
+                .width = 160,
+                .height = 85,
+            },
             .targets = {texture},
             .target_count = 1,
 
@@ -248,18 +256,21 @@ i32 main(void) {
         });
 
     RenderPass blit_pass = render_pass_new((RenderPassDesc) {
-            .run = blit_pass_run,
+            .execute = blit_pass_execute,
             .user_data = &fsq,
-
-            .resize = NULL,
-            .screen_size_dependant = false,
-
-            .targets = {},
-            .target_count = 0,
 
             .inputs = {texture},
             .input_count = 1,
+
+            .viewport = {
+                .width = 1280,
+                .height = 720,
+            },
         });
+
+    RenderPipeline pipeline = {0};
+    render_pipeline_add_pass(&pipeline, geometry_pass);
+    render_pipeline_add_pass(&pipeline, blit_pass);
 
     // -------------------------------------------------------------------------
 
@@ -280,8 +291,7 @@ i32 main(void) {
             fps = 0;
         }
 
-        render_pass_run(geometry_pass);
-        render_pass_run(blit_pass);
+        render_pipeline_execute(&pipeline);
 
         window_swap_buffers(window);
         window_poll_events();

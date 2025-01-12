@@ -550,3 +550,7 @@ void gfx_draw_indexed(GfxVertexArray vertex_array, u32 index_count, u32 first_in
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
     glBindVertexArray(0);
 }
+
+void gfx_viewport(u32 width, u32 height) {
+    glViewport(0, 0, width, height);
+}

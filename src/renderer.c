@@ -1,6 +1,8 @@
 #include "renderer.h"
 #include "graphics.h"
 
+// -- Render pass --------------------------------------------------------------
+
 RenderPass render_pass_new(RenderPassDesc desc) {
     RenderPass pass = {
         .desc = desc,
@@ -20,17 +22,31 @@ RenderPass render_pass_new(RenderPassDesc desc) {
     return pass;
 }
 
-void render_pass_run(RenderPass pass) {
+void render_pass_execute(RenderPass pass) {
+    RenderPassDesc desc = pass.desc;
+    gfx_viewport(desc.viewport.width, desc.viewport.height);
+
     if (!pass.targets_swapchain) {
         gfx_framebuffer_bind(pass.fb);
     } else {
         gfx_framebuffer_unbind();
     }
 
-    RenderPassDesc desc = pass.desc;
-    desc.run(desc.inputs, desc.input_count, desc.user_data);
+    desc.execute(desc.inputs, desc.input_count, desc.user_data);
 
     if (!pass.targets_swapchain) {
         gfx_framebuffer_unbind();
+    }
+}
+
+// -- Render pipeline ----------------------------------------------------------
+
+void render_pipeline_add_pass(RenderPipeline* pipeline, RenderPass pass) {
+    pipeline->passes[pipeline->pass_count++] = pass;
+}
+
+void render_pipeline_execute(const RenderPipeline* pipeline) {
+    for (u8 i = 0; i < pipeline->pass_count; i++) {
+        render_pass_execute(pipeline->passes[i]);
     }
 }

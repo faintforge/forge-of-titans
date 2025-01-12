@@ -3,15 +3,22 @@
 
 #include "graphics.h"
 
+// -- Render pass --------------------------------------------------------------
+
 typedef struct RenderPass RenderPass;
 
 typedef struct RenderPassDesc RenderPassDesc;
 struct RenderPassDesc {
-    void (*run)(const GfxTexture* inputs, u8 input_count, void* user_data);
+    void (*execute)(const GfxTexture* inputs, u8 input_count, void* user_data);
     void* user_data;
 
     void (*resize)(RenderPass* pass);
     b8 screen_size_dependant;
+
+    struct {
+        u32 width;
+        u32 height;
+    } viewport;
 
     // If there's no targets specificed then it's assumed the pass is targeting
     // the swapchain.
@@ -29,6 +36,17 @@ struct RenderPass {
 };
 
 extern RenderPass render_pass_new(RenderPassDesc desc);
-extern void       render_pass_run(RenderPass pass);
+extern void       render_pass_execute(RenderPass pass);
+
+// -- Render pipeline ----------------------------------------------------------
+
+typedef struct RenderPipeline RenderPipeline;
+struct RenderPipeline {
+    RenderPass passes[32];
+    u8 pass_count;
+};
+
+extern void render_pipeline_add_pass(RenderPipeline* pipeline, RenderPass pass);
+extern void render_pipeline_execute(const RenderPipeline* pipeline);
 
 #endif // RENDERER_H
