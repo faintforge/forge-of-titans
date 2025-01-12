@@ -100,7 +100,10 @@ struct GeometryInfo {
     GfxVertexArray vertex_array;
 };
 
-static void geometry_pass_run(void* user_data) {
+static void geometry_pass_run(const GfxTexture* inputs, u8 input_count, void* user_data) {
+    (void) inputs;
+    (void) input_count;
+
     GeometryInfo* info = user_data;
 
     gfx_clear(gfx_color_rgb_hex(0x6495ed));
@@ -109,7 +112,10 @@ static void geometry_pass_run(void* user_data) {
     gfx_draw_indexed(info->vertex_array, 6, 0);
 }
 
-static void blit_pass_run(void* user_data) {
+static void blit_pass_run(const GfxTexture* inputs, u8 input_count, void* user_data) {
+    for (u8 i = 0; i < input_count; i++) {
+        gfx_texture_bind(inputs[i], i);
+    }
     FullscreenQuad* fsq = user_data;
     fullscreen_quad_draw(*fsq);
 }

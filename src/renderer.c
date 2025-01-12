@@ -27,10 +27,8 @@ void render_pass_run(RenderPass pass) {
         gfx_framebuffer_unbind();
     }
 
-    for (u8 i = 0; i < pass.desc.input_count; i++) {
-        gfx_texture_bind(pass.desc.inputs[i], i);
-    }
-    pass.desc.run(pass.desc.user_data);
+    RenderPassDesc desc = pass.desc;
+    desc.run(desc.inputs, desc.input_count, desc.user_data);
 
     if (!pass.targets_swapchain) {
         gfx_framebuffer_unbind();

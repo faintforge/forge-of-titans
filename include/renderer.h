@@ -7,7 +7,7 @@ typedef struct RenderPass RenderPass;
 
 typedef struct RenderPassDesc RenderPassDesc;
 struct RenderPassDesc {
-    void (*run)(void* user_data);
+    void (*run)(const GfxTexture* inputs, u8 input_count, void* user_data);
     void* user_data;
 
     void (*resize)(RenderPass* pass);
