@@ -12,7 +12,7 @@ struct RenderPassDesc {
     void (*execute)(const GfxTexture* inputs, u8 input_count, void* user_data);
     void* user_data;
 
-    void (*resize)(RenderPass* pass);
+    void (*resize)(RenderPassDesc* pass, WDL_Ivec2 size);
     b8 screen_size_dependant;
 
     WDL_Ivec2 viewport;
@@ -45,6 +45,7 @@ struct RenderPipeline {
 
 extern void render_pipeline_add_pass(RenderPipeline* pipeline, RenderPass pass);
 extern void render_pipeline_execute(const RenderPipeline* pipeline);
+extern void render_pipeline_resize(RenderPipeline* pipeline, WDL_Ivec2 size);
 
 // -- Camera -------------------------------------------------------------------
 

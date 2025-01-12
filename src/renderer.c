@@ -53,6 +53,15 @@ void render_pipeline_execute(const RenderPipeline* pipeline) {
     }
 }
 
+void render_pipeline_resize(RenderPipeline* pipeline, WDL_Ivec2 size) {
+    for (u8 i = 0; i < pipeline->pass_count; i++) {
+        RenderPass* pass = &pipeline->passes[i];
+        if (pass->desc.screen_size_dependant) {
+            pass->desc.resize(&pass->desc, size);
+        }
+    }
+}
+
 // -- Camera -------------------------------------------------------------------
 
 WDL_Mat4 camera_proj(Camera cam) {

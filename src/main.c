@@ -6,8 +6,13 @@
 #include "renderer.h"
 #include "utils.h"
 
+typedef struct State State;
+struct State {
+    RenderPipeline pipeline;
+};
+
 static Camera camera = {
-    .zoom = 5.0f,
+    .zoom = 15.0f,
 };
 
 typedef struct FullscreenQuad FullscreenQuad;
@@ -75,8 +80,26 @@ void fullscreen_quad_draw(FullscreenQuad fsq) {
 }
 
 static void resize_cb(Window* window, WDL_Ivec2 size) {
-    (void) window;
+    State* state = window_get_user_data(window);
+    render_pipeline_resize(&state->pipeline, size);
     WDL_INFO("Resize: %ux%u", size.x, size.y);
+}
+
+static void resize_viewport(RenderPassDesc* desc, WDL_Ivec2 size) {
+    desc->viewport = size;
+}
+
+static void resize_quarter_screen_texture(RenderPassDesc* desc, WDL_Ivec2 size) {
+    WDL_Ivec2 small = wdl_iv2_divs(size, 4);
+    for (u32 i = 0; i < desc->target_count; i++) {
+        gfx_texture_resize(desc->targets[i], (GfxTextureDesc) {
+                .data = NULL,
+                .size = small,
+                .format = GFX_TEXTURE_FORMAT_RGB_U8,
+                .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
+            });
+    }
+    resize_viewport(desc, small);
 }
 
 static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void* user_data) {
@@ -88,12 +111,22 @@ static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void
     gfx_clear(GFX_COLOR_BLACK);
     batch_begin(br);
 
-    draw_quad(br, (Quad) {
-            .pos = wdl_v2s(0.0f),
-            .size = wdl_v2s(1.0f),
-            .rotation = wdl_os_get_time(),
-            .color = gfx_color_hsv(wdl_os_get_time() * 90.0f, 0.75f, 1.0f),
-        }, camera);
+    const WDL_Ivec2 grid = wdl_iv2(10, 10);
+    for (i32 y = 0; y < grid.y; y++) {
+        for (i32 x = 0; x < grid.x; x++) {
+            WDL_Vec2 pos = wdl_v2(x, y);
+            pos = wdl_v2_sub(pos, wdl_v2_divs(wdl_v2(grid.x - 1, grid.y - 1), 2.0f));
+
+            f32 offset = (x + y) / 5.0f;
+
+            draw_quad(br, (Quad) {
+                    .pos = pos,
+                    .size = wdl_v2_normalized(wdl_v2s(1.0f)),
+                    .rotation = offset + wdl_os_get_time(),
+                    .color = gfx_color_hsv((offset + wdl_os_get_time()) * 90.0f, 0.75f, 1.0f),
+                }, camera);
+        }
+    }
 
     batch_end(br);
 }
@@ -110,12 +143,15 @@ i32 main(void) {
     wdl_init();
     WDL_Arena* arena = wdl_arena_create();
 
+    State state = {0};
+
     Window* window = window_create(arena, (WindowDesc) {
             .title = "Forge of Titans",
             .size = wdl_iv2(800, 600),
             .resize_cb = resize_cb,
-            .resizable = false,
+            .resizable = true,
             .vsync = false,
+            .user_data = &state,
         });
     if (window == NULL) {
         WDL_ERROR("Window creation failed!");
@@ -135,16 +171,13 @@ i32 main(void) {
     // -------------------------------------------------------------------------
 
     FullscreenQuad fsq = fullscreen_quad_new();
-
-    // -------------------------------------------------------------------------
-
     BatchRenderer br = batch_renderer_new(arena, 4096);
 
     // -------------------------------------------------------------------------
 
     GfxTexture texture = gfx_texture_new((GfxTextureDesc) {
             .data = NULL,
-            .size = wdl_iv2_divs(window_get_size(window), 1),
+            .size = wdl_iv2_divs(window_get_size(window), 4),
             .format = GFX_TEXTURE_FORMAT_RGB_U8,
             .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
         });
@@ -153,8 +186,8 @@ i32 main(void) {
             .execute = geometry_pass_execute,
             .user_data = &br,
 
-            .resize = NULL,
-            .screen_size_dependant = false,
+            .resize = resize_quarter_screen_texture,
+            .screen_size_dependant = true,
 
             .viewport = gfx_texture_get_size(texture),
             .targets = {texture},
@@ -172,11 +205,12 @@ i32 main(void) {
             .input_count = 1,
 
             .viewport = window_get_size(window),
+            .screen_size_dependant = true,
+            .resize = resize_viewport,
         });
 
-    RenderPipeline pipeline = {0};
-    render_pipeline_add_pass(&pipeline, geometry_pass);
-    render_pipeline_add_pass(&pipeline, blit_pass);
+    render_pipeline_add_pass(&state.pipeline, geometry_pass);
+    render_pipeline_add_pass(&state.pipeline, blit_pass);
 
     // -------------------------------------------------------------------------
 
@@ -198,7 +232,7 @@ i32 main(void) {
         }
 
         camera.screen_size = window_get_size(window);
-        render_pipeline_execute(&pipeline);
+        render_pipeline_execute(&state.pipeline);
 
         window_swap_buffers(window);
         window_poll_events();

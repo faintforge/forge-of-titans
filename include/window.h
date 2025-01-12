@@ -14,6 +14,7 @@ struct WindowDesc {
     b8 resizable;
     b8 vsync;
     ResizeCallback resize_cb;
+    void* user_data;
 };
 
 extern Window*   window_create(WDL_Arena* arena, WindowDesc desc);
@@ -23,5 +24,6 @@ extern b8        window_is_open(const Window* window);
 extern void      window_swap_buffers(Window* window);
 extern void      window_make_current(Window* window);
 extern WDL_Ivec2 window_get_size(const Window* window);
+extern void*     window_get_user_data(const Window* window);
 
 #endif // WINDOW_H

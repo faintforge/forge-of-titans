@@ -8,6 +8,7 @@ struct Window {
     b8 is_open;
     WDL_Ivec2 size;
     b8 vsync;
+    void* user_data;
 
     ResizeCallback resize_cb;
 };
@@ -46,6 +47,7 @@ Window* window_create(WDL_Arena* arena, WindowDesc desc) {
         .size = desc.size,
         .vsync = desc.vsync,
         .resize_cb = desc.resize_cb,
+        .user_data = desc.user_data,
     };
     glfwSetWindowUserPointer(window->handle, window);
     glfwSetWindowCloseCallback(window->handle, close_cb);
@@ -81,4 +83,8 @@ void window_make_current(Window* window) {
 
 WDL_Ivec2 window_get_size(const Window* window) {
     return window->size;
+}
+
+void* window_get_user_data(const Window* window) {
+    return window->user_data;
 }
