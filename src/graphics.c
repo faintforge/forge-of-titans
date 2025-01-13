@@ -358,6 +358,28 @@ b8 gfx_shader_is_null(GfxShader shader) {
     return shader.handle == NULL;
 }
 
+void gfx_shader_uniform_i32(GfxShader shader, WDL_Str name, i32 value) {
+    ASSERT(!gfx_shader_is_null(shader), "Can't set a uniform on a NULL shader.");
+    InternalShader* internal = resource_pool_get_data(shader.handle);
+    glUseProgram(internal->gl_handle);
+    WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
+    const char* cstr = wdl_str_to_cstr(scratch.arena, name);
+    u32 loc = glGetUniformLocation(internal->gl_handle, cstr);
+    wdl_scratch_end(scratch);
+    glUniform1i(loc, value);
+}
+
+void gfx_shader_uniform_i32_arr(GfxShader shader, WDL_Str name, const i32* arr, u32 count) {
+    ASSERT(!gfx_shader_is_null(shader), "Can't set a uniform on a NULL shader.");
+    InternalShader* internal = resource_pool_get_data(shader.handle);
+    glUseProgram(internal->gl_handle);
+    WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
+    const char* cstr = wdl_str_to_cstr(scratch.arena, name);
+    u32 loc = glGetUniformLocation(internal->gl_handle, cstr);
+    wdl_scratch_end(scratch);
+    glUniform1iv(loc, count, arr);
+}
+
 // -- Texture ------------------------------------------------------------------
 
 GfxTexture gfx_texture_new(GfxTextureDesc desc) {
@@ -492,6 +514,10 @@ void gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc) {
 WDL_Ivec2 gfx_texture_get_size(GfxTexture texture) {
     InternalTexture* internal = resource_pool_get_data(texture.handle);
     return internal->size;
+}
+
+b8 gfx_texture_is_null(GfxTexture texture) {
+    return texture.handle == NULL;
 }
 
 // -- Framebuffer --------------------------------------------------------------

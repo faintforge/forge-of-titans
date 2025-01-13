@@ -13,6 +13,7 @@ struct State {
 
 static Camera camera = {
     .zoom = 15.0f,
+    .pos = {0.0f, 0.0f},
 };
 
 typedef struct FullscreenQuad FullscreenQuad;
@@ -106,6 +107,7 @@ typedef struct GeometryPassData GeometryPassData;
 struct GeometryPassData {
     BatchRenderer* br;
     GfxShader shader;
+    GfxTexture texture;
 };
 
 static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void* user_data) {
@@ -117,6 +119,12 @@ static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void
 
     gfx_clear(GFX_COLOR_BLACK);
     batch_begin(br, data->shader);
+
+    draw_quad(br, (Quad) {
+            .size = wdl_v2(5, 5),
+            .rotation = 3.14f / 8.0f,
+            .color = GFX_COLOR_WHITE,
+        }, camera);
 
     const WDL_Ivec2 grid = wdl_iv2(10, 10);
     for (i32 y = 0; y < grid.y; y++) {
@@ -131,6 +139,7 @@ static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void
                     .size = wdl_v2_normalized(wdl_v2s(1.0f)),
                     .rotation = offset + wdl_os_get_time(),
                     .color = gfx_color_hsv((offset + wdl_os_get_time()) * 90.0f, 0.75f, 1.0f),
+                    .texture = data->texture,
                 }, camera);
         }
     }
@@ -157,7 +166,7 @@ i32 main(void) {
             .size = wdl_iv2(800, 600),
             .resize_cb = resize_cb,
             .resizable = false,
-            .vsync = true,
+            .vsync = false,
             .user_data = &state,
         });
     if (window == NULL) {
@@ -184,11 +193,40 @@ i32 main(void) {
     WDL_Str vertex_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/batch.vert.glsl"));
     WDL_Str fragment_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/batch.frag.glsl"));
     GfxShader geometry_shader = gfx_shader_new(vertex_source, fragment_source);
+    gfx_shader_use(geometry_shader);
+    i32 samplers[32] = {0};
+    for (u32 i = 0; i < WDL_ARRLEN(samplers); i++) {
+        samplers[i] = i;
+    }
+    gfx_shader_uniform_i32_arr(geometry_shader, WDL_STR_LIT("textures"), samplers, WDL_ARRLEN(samplers));
     wdl_scratch_end(scratch);
+
+    GfxTexture checker_texture;
+    {
+        const WDL_Ivec2 size = {2, 2};
+        u8 pixels[size.x*size.y*4];
+        for (i32 y = 0; y < size.y; y++) {
+            for (i32 x = 0; x < size.x; x++) {
+                u8 color = ((x + y) % 2) * 128 + 127;
+
+                pixels[(x + y * size.x) * 4 + 0] = color;
+                pixels[(x + y * size.x) * 4 + 1] = color;
+                pixels[(x + y * size.x) * 4 + 2] = color;
+                pixels[(x + y * size.x) * 4 + 3] = 255;
+            }
+        }
+        checker_texture = gfx_texture_new((GfxTextureDesc) {
+                .data = pixels,
+                .size = size,
+                .format = GFX_TEXTURE_FORMAT_RGBA_U8,
+                .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
+            });
+    }
 
     GeometryPassData geometry_data = {
         .br = br,
         .shader = geometry_shader,
+        .texture = checker_texture,
     };
 
     // -------------------------------------------------------------------------

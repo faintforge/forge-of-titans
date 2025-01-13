@@ -103,6 +103,8 @@ struct GfxShader {
 extern GfxShader gfx_shader_new(WDL_Str vertex_source, WDL_Str fragment_source);
 extern void      gfx_shader_use(GfxShader shader);
 extern b8        gfx_shader_is_null(GfxShader shader);
+extern void      gfx_shader_uniform_i32(GfxShader shader, WDL_Str name, i32 value);
+extern void      gfx_shader_uniform_i32_arr(GfxShader shader, WDL_Str name, const i32* arr, u32 count);
 
 // -- Texture ------------------------------------------------------------------
 
@@ -143,10 +145,13 @@ struct GfxTextureDesc {
     GfxTextureSampler sampler;
 };
 
+#define GFX_TEXTURE_NULL ((GfxTexture) { NULL })
+
 extern GfxTexture gfx_texture_new(GfxTextureDesc desc);
 extern void       gfx_texture_bind(GfxTexture texture, u32 slot);
 extern void       gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc);
 extern WDL_Ivec2  gfx_texture_get_size(GfxTexture texture);
+extern b8         gfx_texture_is_null(GfxTexture texture);
 
 // -- Framebuffer --------------------------------------------------------------
 

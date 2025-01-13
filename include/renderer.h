@@ -69,6 +69,7 @@ struct Quad {
     WDL_Vec2 size;
     f32 rotation;
     GfxColor color;
+    GfxTexture texture;
 };
 
 extern BatchRenderer* batch_renderer_new(WDL_Arena* arena, u32 max_quad_count);

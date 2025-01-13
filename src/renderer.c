@@ -67,7 +67,8 @@ void render_pipeline_resize(RenderPipeline* pipeline, WDL_Ivec2 size) {
 WDL_Mat4 camera_proj(Camera cam) {
     f32 aspect = (f32) cam.screen_size.x / (f32) cam.screen_size.y;
     f32 zoom = cam.zoom * 0.5f;
-    return wdl_m4_ortho_projection(-aspect * zoom, aspect * zoom, zoom, -zoom, 1.0f, -1.0f);
+    WDL_Mat4 proj = wdl_m4_ortho_projection(-aspect * zoom, aspect * zoom, zoom, -zoom, 1.0f, -1.0f);
+    return proj;
 }
 
 WDL_Mat4 camera_proj_inv(Camera cam) {
@@ -76,13 +77,23 @@ WDL_Mat4 camera_proj_inv(Camera cam) {
     return wdl_m4_inv_ortho_projection(-aspect * zoom, aspect * zoom, zoom, -zoom, 1.0f, -1.0f);
 }
 
+WDL_Mat4 camera_view(Camera cam) {
+    WDL_Mat4 view = WDL_M4_IDENTITY;
+    view.a.w = -cam.pos.x;
+    view.b.w = -cam.pos.y;
+    return view;
+}
+
 // -- Batch renderer -----------------------------------------------------------
+
+#define BR_MAX_TEXTURE_COUNT 32
 
 typedef struct Vertex Vertex;
 struct Vertex {
     WDL_Vec2 pos;
     WDL_Vec2 uv;
     GfxColor color;
+    f32 texture_index;
 };
 
 struct BatchRenderer {
@@ -93,6 +104,9 @@ struct BatchRenderer {
     GfxBuffer vertex_buffer;
     GfxVertexArray vertex_array;
     GfxShader shader;
+
+    GfxTexture textures[BR_MAX_TEXTURE_COUNT];
+    u8 curr_texture;
 };
 
 BatchRenderer* batch_renderer_new(WDL_Arena* arena, u32 max_quad_count) {
@@ -148,11 +162,20 @@ BatchRenderer* batch_renderer_new(WDL_Arena* arena, u32 max_quad_count) {
                             .count = 4,
                             .offset = WDL_OFFSET(Vertex, color),
                         },
+                        [3] = {
+                            .count = 1,
+                            .offset = WDL_OFFSET(Vertex, texture_index),
+                        },
                     },
-                    .attrib_count = 3,
+                    .attrib_count = 4,
                 },
                 .vertex_buffer = vertex_buffer,
                 .index_buffer = index_buffer,
+            }),
+        .textures[0] = gfx_texture_new((GfxTextureDesc) {
+                .data = (u8[]) { 255, 255, 255, 255 },
+                .size = wdl_iv2s(1),
+                .format = GFX_TEXTURE_FORMAT_RGBA_U8,
             }),
     };
     return br;
@@ -161,18 +184,42 @@ BatchRenderer* batch_renderer_new(WDL_Arena* arena, u32 max_quad_count) {
 void batch_begin(BatchRenderer* br, GfxShader shader) {
     br->shader = shader;
     br->curr_quad = 0;
+    br->curr_texture = 1;
 }
 
 void batch_end(BatchRenderer* br) {
     gfx_buffer_subdata(br->vertex_buffer, br->vertices, br->curr_quad * 4 * sizeof(Vertex), 0);
+    for (u8 i = 0; i < br->curr_texture; i++) {
+        gfx_texture_bind(br->textures[i], i);
+    }
     gfx_shader_use(br->shader);
     gfx_draw_indexed(br->vertex_array, br->curr_quad * 6, 0);
 }
 
 void draw_quad(BatchRenderer* br, Quad quad, Camera cam) {
-    if (br->curr_quad == br->max_quad_count) {
+    b8 texture_found = false;
+    f32 texture_index = 0;
+    if (gfx_texture_is_null(quad.texture)) {
+        texture_found = true;
+    } else {
+        for (u8 i = 1; i < br->curr_texture; i++) {
+            if (br->textures[i].handle == quad.texture.handle) {
+                texture_index = i;
+                texture_found = true;
+                break;
+            }
+        }
+    }
+
+    if (br->curr_quad == br->max_quad_count ||
+            (br->curr_texture == BR_MAX_TEXTURE_COUNT && !texture_found)) {
         batch_end(br);
         batch_begin(br, br->shader);
+    }
+
+    if (!texture_found) {
+        texture_index = br->curr_texture;
+        br->textures[br->curr_texture++] = quad.texture;
     }
 
     const WDL_Vec2 vert_pos[4] = {
@@ -191,6 +238,7 @@ void draw_quad(BatchRenderer* br, Quad quad, Camera cam) {
 
     // TODO: Cache the projection matrix in the camera.
     WDL_Mat4 proj = camera_proj(cam);
+    WDL_Mat4 view = camera_view(cam);
     for (u8 i = 0; i < 4; i++) {
         WDL_Vec2 pos = vert_pos[i];
         pos = wdl_v2(pos.x * cosf(quad.rotation) - pos.y * sinf(quad.rotation),
@@ -199,12 +247,14 @@ void draw_quad(BatchRenderer* br, Quad quad, Camera cam) {
         pos = wdl_v2_add(pos, quad.pos);
 
         WDL_Vec4 pos_v4 = wdl_v4(pos.x, pos.y, 0.0f, 1.0f);
+        pos_v4 = wdl_m4_mul_vec(view, pos_v4);
         pos_v4 = wdl_m4_mul_vec(proj, pos_v4);
 
         br->vertices[br->curr_quad * 4 + i] = (Vertex) {
             .pos = wdl_v2(pos_v4.x, pos_v4.y),
             .uv = uv[i],
             .color = quad.color,
+            .texture_index = texture_index,
         };
     }
 
