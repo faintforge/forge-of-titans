@@ -102,14 +102,21 @@ static void resize_screen_texture(RenderPassDesc* desc, WDL_Ivec2 size) {
     resize_viewport(desc, small);
 }
 
+typedef struct GeometryPassData GeometryPassData;
+struct GeometryPassData {
+    BatchRenderer* br;
+    GfxShader shader;
+};
+
 static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void* user_data) {
     (void) inputs;
     (void) input_count;
 
-    BatchRenderer* br = user_data;
+    GeometryPassData* data = user_data;
+    BatchRenderer* br = data->br;
 
     gfx_clear(GFX_COLOR_BLACK);
-    batch_begin(br);
+    batch_begin(br, data->shader);
 
     const WDL_Ivec2 grid = wdl_iv2(10, 10);
     for (i32 y = 0; y < grid.y; y++) {
@@ -173,6 +180,17 @@ i32 main(void) {
     FullscreenQuad fsq = fullscreen_quad_new();
     BatchRenderer* br = batch_renderer_new(arena, 4096);
 
+    WDL_Scratch scratch = wdl_scratch_begin(&arena, 1);
+    WDL_Str vertex_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/batch.vert.glsl"));
+    WDL_Str fragment_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/batch.frag.glsl"));
+    GfxShader geometry_shader = gfx_shader_new(vertex_source, fragment_source);
+    wdl_scratch_end(scratch);
+
+    GeometryPassData geometry_data = {
+        .br = br,
+        .shader = geometry_shader,
+    };
+
     // -------------------------------------------------------------------------
 
     GfxTexture texture = gfx_texture_new((GfxTextureDesc) {
@@ -184,7 +202,7 @@ i32 main(void) {
 
     RenderPass geometry_pass = render_pass_new((RenderPassDesc) {
             .execute = geometry_pass_execute,
-            .user_data = br,
+            .user_data = &geometry_data,
 
             .resize = resize_screen_texture,
             .screen_size_dependant = true,

@@ -126,12 +126,6 @@ BatchRenderer* batch_renderer_new(WDL_Arena* arena, u32 max_quad_count) {
         });
     wdl_scratch_end(scratch);
 
-    scratch = wdl_scratch_begin(&arena, 1);
-    WDL_Str vertex_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/batch.vert.glsl"));
-    WDL_Str fragment_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/batch.frag.glsl"));
-    GfxShader shader = gfx_shader_new(vertex_source, fragment_source);
-    wdl_scratch_end(scratch);
-
     BatchRenderer* br = wdl_arena_push_no_zero(arena, sizeof(BatchRenderer));
     *br = (BatchRenderer) {
         .max_quad_count = max_quad_count,
@@ -160,12 +154,12 @@ BatchRenderer* batch_renderer_new(WDL_Arena* arena, u32 max_quad_count) {
                 .vertex_buffer = vertex_buffer,
                 .index_buffer = index_buffer,
             }),
-        .shader = shader,
     };
     return br;
 }
 
-void batch_begin(BatchRenderer* br) {
+void batch_begin(BatchRenderer* br, GfxShader shader) {
+    br->shader = shader;
     br->curr_quad = 0;
 }
 
@@ -176,6 +170,11 @@ void batch_end(BatchRenderer* br) {
 }
 
 void draw_quad(BatchRenderer* br, Quad quad, Camera cam) {
+    if (br->curr_quad == br->max_quad_count) {
+        batch_end(br);
+        batch_begin(br, br->shader);
+    }
+
     const WDL_Vec2 vert_pos[4] = {
         wdl_v2(-0.5f, -0.5f),
         wdl_v2( 0.5f, -0.5f),

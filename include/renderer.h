@@ -72,7 +72,7 @@ struct Quad {
 };
 
 extern BatchRenderer* batch_renderer_new(WDL_Arena* arena, u32 max_quad_count);
-extern void batch_begin(BatchRenderer* br);
+extern void batch_begin(BatchRenderer* br, GfxShader shader);
 extern void batch_end(BatchRenderer* br);
 extern void draw_quad(BatchRenderer* br, Quad quad, Camera cam);
 
