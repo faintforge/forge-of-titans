@@ -89,8 +89,8 @@ static void resize_viewport(RenderPassDesc* desc, WDL_Ivec2 size) {
     desc->viewport = size;
 }
 
-static void resize_quarter_screen_texture(RenderPassDesc* desc, WDL_Ivec2 size) {
-    WDL_Ivec2 small = wdl_iv2_divs(size, 4);
+static void resize_screen_texture(RenderPassDesc* desc, WDL_Ivec2 size) {
+    WDL_Ivec2 small = wdl_iv2_divs(size, 1);
     for (u32 i = 0; i < desc->target_count; i++) {
         gfx_texture_resize(desc->targets[i], (GfxTextureDesc) {
                 .data = NULL,
@@ -149,8 +149,8 @@ i32 main(void) {
             .title = "Forge of Titans",
             .size = wdl_iv2(800, 600),
             .resize_cb = resize_cb,
-            .resizable = true,
-            .vsync = false,
+            .resizable = false,
+            .vsync = true,
             .user_data = &state,
         });
     if (window == NULL) {
@@ -171,22 +171,22 @@ i32 main(void) {
     // -------------------------------------------------------------------------
 
     FullscreenQuad fsq = fullscreen_quad_new();
-    BatchRenderer br = batch_renderer_new(arena, 4096);
+    BatchRenderer* br = batch_renderer_new(arena, 4096);
 
     // -------------------------------------------------------------------------
 
     GfxTexture texture = gfx_texture_new((GfxTextureDesc) {
             .data = NULL,
-            .size = wdl_iv2_divs(window_get_size(window), 4),
+            .size = window_get_size(window),
             .format = GFX_TEXTURE_FORMAT_RGB_U8,
             .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
         });
 
     RenderPass geometry_pass = render_pass_new((RenderPassDesc) {
             .execute = geometry_pass_execute,
-            .user_data = &br,
+            .user_data = br,
 
-            .resize = resize_quarter_screen_texture,
+            .resize = resize_screen_texture,
             .screen_size_dependant = true,
 
             .viewport = gfx_texture_get_size(texture),

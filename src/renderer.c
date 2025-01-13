@@ -78,7 +78,24 @@ WDL_Mat4 camera_proj_inv(Camera cam) {
 
 // -- Batch renderer -----------------------------------------------------------
 
-BatchRenderer batch_renderer_new(WDL_Arena* arena, u32 max_quad_count) {
+typedef struct Vertex Vertex;
+struct Vertex {
+    WDL_Vec2 pos;
+    WDL_Vec2 uv;
+    GfxColor color;
+};
+
+struct BatchRenderer {
+    u32 max_quad_count;
+    u32 curr_quad;
+
+    Vertex* vertices;
+    GfxBuffer vertex_buffer;
+    GfxVertexArray vertex_array;
+    GfxShader shader;
+};
+
+BatchRenderer* batch_renderer_new(WDL_Arena* arena, u32 max_quad_count) {
     u64 vertices_size = max_quad_count * 4 * sizeof(Vertex);
 
     GfxBuffer vertex_buffer = gfx_buffer_new((GfxBufferDesc) {
@@ -115,7 +132,8 @@ BatchRenderer batch_renderer_new(WDL_Arena* arena, u32 max_quad_count) {
     GfxShader shader = gfx_shader_new(vertex_source, fragment_source);
     wdl_scratch_end(scratch);
 
-    BatchRenderer br = {
+    BatchRenderer* br = wdl_arena_push_no_zero(arena, sizeof(BatchRenderer));
+    *br = (BatchRenderer) {
         .max_quad_count = max_quad_count,
 
         .vertices = wdl_arena_push_no_zero(arena, vertices_size),
