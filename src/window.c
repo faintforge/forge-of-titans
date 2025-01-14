@@ -31,7 +31,7 @@ Window* window_create(WDL_Arena* arena, WindowDesc desc) {
         return NULL;
     }
 
-    Window* window = wdl_arena_push(arena, sizeof(Window));
+    Window* window = wdl_arena_push_no_zero(arena, sizeof(Window));
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);

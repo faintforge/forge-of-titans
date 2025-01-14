@@ -5,6 +5,7 @@
 #include "graphics.h"
 #include "renderer.h"
 #include "utils.h"
+#include "profiler.h"
 
 typedef struct State State;
 struct State {
@@ -157,10 +158,14 @@ static void blit_pass_execute(const GfxTexture* inputs, u8 input_count, void* us
 
 i32 main(void) {
     wdl_init();
+    profiler_init();
+
+    prof_begin(WDL_STR_LIT("Startup"));
     WDL_Arena* arena = wdl_arena_create();
 
     State state = {0};
 
+    prof_begin(WDL_STR_LIT("Window creation"));
     Window* window = window_create(arena, (WindowDesc) {
             .title = "Forge of Titans",
             .size = wdl_iv2(800, 600),
@@ -176,13 +181,16 @@ i32 main(void) {
         WDL_INFO("Window created successfully!");
     }
     window_make_current(window);
+    prof_end();
 
+    prof_begin(WDL_STR_LIT("Graphics init"));
     if (!gfx_init()) {
         WDL_ERROR("Graphics system failed to initialize!");
         return 1;
     } else {
         WDL_INFO("Graphics system initialized successfully!");
     }
+    prof_end();
 
     // -------------------------------------------------------------------------
 
@@ -268,13 +276,22 @@ i32 main(void) {
     render_pipeline_add_pass(&state.pipeline, geometry_pass);
     render_pipeline_add_pass(&state.pipeline, blit_pass);
 
+    prof_end(); // Startup
+
+    profiler_dump_frame();
+
+    return 0;
+
     // -------------------------------------------------------------------------
 
     u32 fps = 0;
     f32 fps_timer = 0.0f;
 
     f32 last = 0.0f;
+    u32 frame = 0;
     while (window_is_open(window)) {
+        profiler_begin_frame(frame);
+        prof_begin(WDL_STR_LIT("MainLoop"));
         f32 curr = wdl_os_get_time();
         f32 dt = curr - last;
         last = curr;
@@ -287,16 +304,25 @@ i32 main(void) {
             fps = 0;
         }
 
+        prof_begin(WDL_STR_LIT("Rendering"));
         camera.screen_size = window_get_size(window);
         render_pipeline_execute(&state.pipeline);
+        prof_end();
 
         window_swap_buffers(window);
         window_poll_events();
+
+        prof_end();
+
+        profiler_dump_frame();
+        profiler_end_frame();
+        frame++;
     }
 
     window_destroy(window);
 
     wdl_arena_destroy(arena);
+    profiler_terminate();
     wdl_terminate();
     return 0;
 }

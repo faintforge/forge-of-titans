@@ -20,3 +20,13 @@ WDL_Str read_file(WDL_Arena* arena, WDL_Str filename) {
 
     return wdl_str(content, len);
 }
+
+u64 fvn1a_hash(const void* data, u64 len) {
+    const u8* _data = data;
+    u64 hash = 2166136261u;
+    for (u64 i = 0; i < len; i++) {
+        hash ^= *(_data + i);
+        hash *= 16777619;
+    }
+    return hash;
+}
