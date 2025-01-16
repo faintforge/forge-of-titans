@@ -249,6 +249,7 @@ void draw_quad_atlas(BatchRenderer* br, Quad quad, WDL_Vec2 uvs[2], Camera cam) 
     WDL_Mat4 view = camera_view(cam);
     for (u8 i = 0; i < 4; i++) {
         WDL_Vec2 pos = vert_pos[i];
+        pos = wdl_v2_sub(pos, quad.pivot);
         pos = wdl_v2(pos.x * cosf(quad.rotation) - pos.y * sinf(quad.rotation),
             pos.x * sinf(quad.rotation) + pos.y * cosf(quad.rotation));
         pos = wdl_v2_mul(pos, quad.size);

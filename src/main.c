@@ -175,7 +175,7 @@ i32 main(void) {
             .size = wdl_iv2(800, 600),
             .resize_cb = resize_cb,
             .resizable = false,
-            .vsync = false,
+            .vsync = true,
             .user_data = &state,
         });
     if (window == NULL) {
@@ -338,10 +338,11 @@ i32 main(void) {
             Glyph glyph = font_get_glyph(font, codepoint, font_size);
             WDL_Vec2 gpos = wdl_v2_add(pos, glyph.offset);
             draw_quad_atlas(br, (Quad) {
-                    .pos = wdl_v2_add(gpos, wdl_v2_div(glyph.size, wdl_v2(2.0f, -2.0f))),
+                    .pos = gpos,
                     .size = glyph.size,
                     .texture = font_get_atlas(font, font_size),
                     .color = GFX_COLOR_WHITE,
+                    .pivot = wdl_v2(-0.5f, 0.5f),
                 }, glyph.uv, ui_cam);
             pos.x += glyph.advance;
         }
