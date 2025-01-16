@@ -8,7 +8,7 @@ WDL_Str read_file(WDL_Arena* arena, WDL_Str filename) {
     // Pop off the cstr_filename from the arena since it's no longer needed.
     wdl_arena_pop(arena, filename.len + 1);
     if (fp == NULL) {
-        WDL_ERROR("Failed to open file '%.*s'.", filename.len, filename.data);
+        wdl_error("Failed to open file '%.*s'.", filename.len, filename.data);
         return (WDL_Str) {0};
     }
 

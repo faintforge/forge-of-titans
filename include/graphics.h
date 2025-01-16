@@ -105,6 +105,8 @@ extern void      gfx_shader_use(GfxShader shader);
 extern b8        gfx_shader_is_null(GfxShader shader);
 extern void      gfx_shader_uniform_i32(GfxShader shader, WDL_Str name, i32 value);
 extern void      gfx_shader_uniform_i32_arr(GfxShader shader, WDL_Str name, const i32* arr, u32 count);
+extern void      gfx_shader_uniform_m4(GfxShader shader, WDL_Str name, WDL_Mat4 value);
+extern void      gfx_shader_uniform_m4_arr(GfxShader shader, WDL_Str name, const WDL_Mat4* arr, u32 count);
 
 // -- Texture ------------------------------------------------------------------
 

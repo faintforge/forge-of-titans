@@ -7,7 +7,7 @@
 
 #define ASSERT(EXPR, MSG, ...) do { \
     if (!(EXPR)) { \
-        WDL_FATAL(MSG, ##__VA_ARGS__); \
+        wdl_fatal(MSG, ##__VA_ARGS__); \
         *(volatile u8*) 0 = 0; \
     } \
 } while (0)
@@ -314,7 +314,7 @@ GfxShader gfx_shader_new(WDL_Str vertex_source, WDL_Str fragment_source) {
     glGetShaderiv(v_shader, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(v_shader, sizeof(info_log), NULL, info_log);
-        WDL_ERROR("Vertex shader compilation error: %s", info_log);
+        wdl_error("Vertex shader compilation error: %s", info_log);
         return GFX_SHADER_NULL;
     }
 
@@ -324,7 +324,7 @@ GfxShader gfx_shader_new(WDL_Str vertex_source, WDL_Str fragment_source) {
     glGetShaderiv(f_shader, GL_COMPILE_STATUS, &success);
     if (!success) {
         glGetShaderInfoLog(f_shader, sizeof(info_log), NULL, info_log);
-        WDL_ERROR("Fragment shader compilation error: %s\n", info_log);
+        wdl_error("Fragment shader compilation error: %s\n", info_log);
         return GFX_SHADER_NULL;
     }
 
@@ -335,7 +335,7 @@ GfxShader gfx_shader_new(WDL_Str vertex_source, WDL_Str fragment_source) {
     glGetProgramiv(program, GL_LINK_STATUS, &success);
     if (!success) {
         glGetProgramInfoLog(program, 512, NULL, info_log);
-        WDL_ERROR("Shader linking error: %s\n", info_log);
+        wdl_error("Shader linking error: %s\n", info_log);
         return GFX_SHADER_NULL;
     }
 
@@ -358,27 +358,36 @@ b8 gfx_shader_is_null(GfxShader shader) {
     return shader.handle == NULL;
 }
 
-void gfx_shader_uniform_i32(GfxShader shader, WDL_Str name, i32 value) {
-    ASSERT(!gfx_shader_is_null(shader), "Can't set a uniform on a NULL shader.");
-    InternalShader* internal = resource_pool_get_data(shader.handle);
-    glUseProgram(internal->gl_handle);
-    WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
-    const char* cstr = wdl_str_to_cstr(scratch.arena, name);
-    u32 loc = glGetUniformLocation(internal->gl_handle, cstr);
+#define uniform_body(shader, name) \
+    ASSERT(!gfx_shader_is_null(shader), "Can't set a uniform on a NULL shader."); \
+    InternalShader* internal = resource_pool_get_data(shader.handle); \
+    glUseProgram(internal->gl_handle); \
+    WDL_Scratch scratch = wdl_scratch_begin(NULL, 0); \
+    const char* cstr = wdl_str_to_cstr(scratch.arena, name); \
+    u32 loc = glGetUniformLocation(internal->gl_handle, cstr); \
     wdl_scratch_end(scratch);
+
+void gfx_shader_uniform_i32(GfxShader shader, WDL_Str name, i32 value) {
+    uniform_body(shader, name);
     glUniform1i(loc, value);
 }
 
 void gfx_shader_uniform_i32_arr(GfxShader shader, WDL_Str name, const i32* arr, u32 count) {
-    ASSERT(!gfx_shader_is_null(shader), "Can't set a uniform on a NULL shader.");
-    InternalShader* internal = resource_pool_get_data(shader.handle);
-    glUseProgram(internal->gl_handle);
-    WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
-    const char* cstr = wdl_str_to_cstr(scratch.arena, name);
-    u32 loc = glGetUniformLocation(internal->gl_handle, cstr);
-    wdl_scratch_end(scratch);
+    uniform_body(shader, name);
     glUniform1iv(loc, count, arr);
 }
+
+void gfx_shader_uniform_m4(GfxShader shader, WDL_Str name, WDL_Mat4 value) {
+    uniform_body(shader, name);
+    glUniformMatrix4fv(loc, 1, false, &value.a.x);
+}
+
+void gfx_shader_uniform_m4_arr(GfxShader shader, WDL_Str name, const WDL_Mat4* arr, u32 count) {
+    uniform_body(shader, name);
+    glUniformMatrix4fv(loc, count, false, (const void*) arr);
+}
+
+#undef uniform_body
 
 // -- Texture ------------------------------------------------------------------
 

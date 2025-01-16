@@ -151,19 +151,19 @@ BatchRenderer* batch_renderer_new(WDL_Arena* arena, u32 max_quad_count) {
                     .attribs = {
                         [0] = {
                             .count = 2,
-                            .offset = WDL_OFFSET(Vertex, pos),
+                            .offset = wdl_offset(Vertex, pos),
                         },
                         [1] = {
                             .count = 2,
-                            .offset = WDL_OFFSET(Vertex, uv),
+                            .offset = wdl_offset(Vertex, uv),
                         },
                         [2] = {
                             .count = 4,
-                            .offset = WDL_OFFSET(Vertex, color),
+                            .offset = wdl_offset(Vertex, color),
                         },
                         [3] = {
                             .count = 1,
-                            .offset = WDL_OFFSET(Vertex, texture_index),
+                            .offset = wdl_offset(Vertex, texture_index),
                         },
                     },
                     .attrib_count = 4,

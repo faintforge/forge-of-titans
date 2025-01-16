@@ -123,7 +123,7 @@ static void print_entry_map(EntryMap map, u32 depth) {
         if (map.used[i]) {
             Entry* entry = &map.entires[i];
             while (entry != NULL) {
-                WDL_INFO("%s%.*s - %u calls - %.2f ms",
+                wdl_info("%s%.*s - %u calls - %.2f ms",
                         spaces,
                         entry->name.len,
                         entry->name.data,
@@ -137,7 +137,7 @@ static void print_entry_map(EntryMap map, u32 depth) {
 }
 
 void profiler_dump_frame(void) {
-    WDL_INFO("-- Profiler dump of frame %u ------------------------------------", prof.current_frame);
+    wdl_info("-- Profiler dump of frame %u ------------------------------------", prof.current_frame);
     print_entry_map(prof.entry_map, 0);
 }
 

@@ -27,8 +27,8 @@ FullscreenQuad fullscreen_quad_new(void) {
     FullscreenQuad fsq = {0};
 
     WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
-    WDL_Str vertex_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/blit.vert.glsl"));
-    WDL_Str fragment_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/blit.frag.glsl"));
+    WDL_Str vertex_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/blit.vert.glsl"));
+    WDL_Str fragment_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/blit.frag.glsl"));
     fsq.shader = gfx_shader_new(vertex_source, fragment_source);
     wdl_scratch_end(scratch);
 
@@ -84,7 +84,7 @@ void fullscreen_quad_draw(FullscreenQuad fsq) {
 static void resize_cb(Window* window, WDL_Ivec2 size) {
     State* state = window_get_user_data(window);
     render_pipeline_resize(&state->pipeline, size);
-    WDL_INFO("Resize: %ux%u", size.x, size.y);
+    wdl_info("Resize: %ux%u", size.x, size.y);
 }
 
 static void resize_viewport(RenderPassDesc* desc, WDL_Ivec2 size) {
@@ -114,6 +114,8 @@ struct GeometryPassData {
 static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void* user_data) {
     (void) inputs;
     (void) input_count;
+
+    prof_begin(wdl_str_lit("Geometry pass"));
 
     GeometryPassData* data = user_data;
     BatchRenderer* br = data->br;
@@ -146,6 +148,7 @@ static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void
     }
 
     batch_end(br);
+    prof_end();
 }
 
 static void blit_pass_execute(const GfxTexture* inputs, u8 input_count, void* user_data) {
@@ -160,12 +163,12 @@ i32 main(void) {
     wdl_init();
     profiler_init();
 
-    prof_begin(WDL_STR_LIT("Startup"));
+    prof_begin(wdl_str_lit("Startup"));
     WDL_Arena* arena = wdl_arena_create();
 
     State state = {0};
 
-    prof_begin(WDL_STR_LIT("Window creation"));
+    prof_begin(wdl_str_lit("Window creation"));
     Window* window = window_create(arena, (WindowDesc) {
             .title = "Forge of Titans",
             .size = wdl_iv2(800, 600),
@@ -175,38 +178,38 @@ i32 main(void) {
             .user_data = &state,
         });
     if (window == NULL) {
-        WDL_ERROR("Window creation failed!");
+        wdl_error("Window creation failed!");
         return 1;
     } else {
-        WDL_INFO("Window created successfully!");
+        wdl_info("Window created successfully!");
     }
     window_make_current(window);
     prof_end();
 
-    prof_begin(WDL_STR_LIT("Graphics init"));
+    prof_begin(wdl_str_lit("Graphics init"));
     if (!gfx_init()) {
-        WDL_ERROR("Graphics system failed to initialize!");
+        wdl_error("Graphics system failed to initialize!");
         return 1;
     } else {
-        WDL_INFO("Graphics system initialized successfully!");
+        wdl_info("Graphics system initialized successfully!");
     }
     prof_end();
 
     // -------------------------------------------------------------------------
 
     FullscreenQuad fsq = fullscreen_quad_new();
-    BatchRenderer* br = batch_renderer_new(arena, 4096);
+    BatchRenderer* br = batch_renderer_new(arena, 8194);
 
     WDL_Scratch scratch = wdl_scratch_begin(&arena, 1);
-    WDL_Str vertex_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/batch.vert.glsl"));
-    WDL_Str fragment_source = read_file(scratch.arena, WDL_STR_LIT("assets/shaders/batch.frag.glsl"));
+    WDL_Str vertex_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/batch.vert.glsl"));
+    WDL_Str fragment_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/batch.frag.glsl"));
     GfxShader geometry_shader = gfx_shader_new(vertex_source, fragment_source);
     gfx_shader_use(geometry_shader);
     i32 samplers[32] = {0};
-    for (u32 i = 0; i < WDL_ARRLEN(samplers); i++) {
+    for (u32 i = 0; i < wdl_arrlen(samplers); i++) {
         samplers[i] = i;
     }
-    gfx_shader_uniform_i32_arr(geometry_shader, WDL_STR_LIT("textures"), samplers, WDL_ARRLEN(samplers));
+    gfx_shader_uniform_i32_arr(geometry_shader, wdl_str_lit("textures"), samplers, wdl_arrlen(samplers));
     wdl_scratch_end(scratch);
 
     GfxTexture checker_texture;
@@ -280,8 +283,6 @@ i32 main(void) {
 
     profiler_dump_frame();
 
-    return 0;
-
     // -------------------------------------------------------------------------
 
     u32 fps = 0;
@@ -291,7 +292,7 @@ i32 main(void) {
     u32 frame = 0;
     while (window_is_open(window)) {
         profiler_begin_frame(frame);
-        prof_begin(WDL_STR_LIT("MainLoop"));
+        prof_begin(wdl_str_lit("MainLoop"));
         f32 curr = wdl_os_get_time();
         f32 dt = curr - last;
         last = curr;
@@ -299,12 +300,12 @@ i32 main(void) {
         fps++;
         fps_timer += dt;
         if (fps_timer >= 1.0f) {
-            WDL_INFO("FPS: %u", fps);
+            wdl_info("FPS: %u", fps);
             fps_timer = 0;
             fps = 0;
         }
 
-        prof_begin(WDL_STR_LIT("Rendering"));
+        prof_begin(wdl_str_lit("Rendering"));
         camera.screen_size = window_get_size(window);
         render_pipeline_execute(&state.pipeline);
         prof_end();
@@ -314,7 +315,6 @@ i32 main(void) {
 
         prof_end();
 
-        profiler_dump_frame();
         profiler_end_frame();
         frame++;
     }
