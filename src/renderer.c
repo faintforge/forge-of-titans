@@ -196,6 +196,13 @@ void batch_end(BatchRenderer* br) {
 }
 
 void draw_quad(BatchRenderer* br, Quad quad, Camera cam) {
+    draw_quad_atlas(br, quad, (WDL_Vec2[2]) {
+            wdl_v2s(0.0f),
+            wdl_v2s(1.0f),
+        }, cam);
+}
+
+void draw_quad_atlas(BatchRenderer* br, Quad quad, WDL_Vec2 uvs[2], Camera cam) {
     b8 texture_found = false;
     f32 texture_index = 0;
     if (gfx_texture_is_null(quad.texture)) {
@@ -228,11 +235,13 @@ void draw_quad(BatchRenderer* br, Quad quad, Camera cam) {
         wdl_v2( 0.5f,  0.5f),
     };
 
+    WDL_Vec2 nw = uvs[0];
+    WDL_Vec2 se = uvs[1];
     const WDL_Vec2 uv[4] = {
-        wdl_v2(0.0f, 0.0f),
-        wdl_v2(1.0f, 0.0f),
-        wdl_v2(0.0f, 1.0f),
-        wdl_v2(1.0f, 1.0f),
+        wdl_v2(nw.x, se.y),
+        wdl_v2(se.x, se.y),
+        wdl_v2(nw.x, nw.y),
+        wdl_v2(se.x, nw.y),
     };
 
     // TODO: Cache the projection matrix in the camera.

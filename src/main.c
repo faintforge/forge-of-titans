@@ -6,6 +6,7 @@
 #include "renderer.h"
 #include "utils.h"
 #include "profiler.h"
+#include "font.h"
 
 typedef struct State State;
 struct State {
@@ -195,6 +196,16 @@ i32 main(void) {
     }
     prof_end();
 
+    prof_begin(wdl_str_lit("Font create"));
+    const u32 font_size = 64;
+    Font* roboto = font_init_file(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"), false);
+    Font* spline_sans = font_init_file(arena, wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"), false);
+    Font* tiny5 = font_init_file(arena, wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"), false);
+    Font* soulside = font_init_file(arena, wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"), false);
+    Font* font = soulside;
+    font_cache_size(font, font_size);
+    prof_end();
+
     // -------------------------------------------------------------------------
 
     FullscreenQuad fsq = fullscreen_quad_new();
@@ -308,6 +319,35 @@ i32 main(void) {
         prof_begin(wdl_str_lit("Rendering"));
         camera.screen_size = window_get_size(window);
         render_pipeline_execute(&state.pipeline);
+
+        WDL_Ivec2 screen_size = window_get_size(window);
+        Camera ui_cam = {
+            .screen_size = screen_size,
+            .zoom = screen_size.y,
+            .pos = wdl_v2(screen_size.x / 2.0f, -screen_size.y / 2.0f),
+        };
+        batch_begin(br, geometry_shader);
+
+        FontMetrics metrics = font_get_metrics(font, font_size);
+        WDL_Str str = wdl_str_lit("Forge of Titans");
+        WDL_Vec2 pos = wdl_v2s(16.0f);
+        pos.y += metrics.ascent;
+        pos.y = -pos.y;
+        for (u32 i = 0; i < str.len; i++) {
+            u8 codepoint = str.data[i];
+            Glyph glyph = font_get_glyph(font, codepoint, font_size);
+            WDL_Vec2 gpos = wdl_v2_add(pos, glyph.offset);
+            draw_quad_atlas(br, (Quad) {
+                    .pos = wdl_v2_add(gpos, wdl_v2_div(glyph.size, wdl_v2(2.0f, -2.0f))),
+                    .size = glyph.size,
+                    .texture = font_get_atlas(font, font_size),
+                    .color = GFX_COLOR_WHITE,
+                }, glyph.uv, ui_cam);
+            pos.x += glyph.advance;
+        }
+
+        batch_end(br);
+
         prof_end();
 
         window_swap_buffers(window);

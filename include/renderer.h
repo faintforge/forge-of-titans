@@ -76,5 +76,8 @@ extern BatchRenderer* batch_renderer_new(WDL_Arena* arena, u32 max_quad_count);
 extern void batch_begin(BatchRenderer* br, GfxShader shader);
 extern void batch_end(BatchRenderer* br);
 extern void draw_quad(BatchRenderer* br, Quad quad, Camera cam);
+// uvs[0] = Top left
+// uvs[1] = Bottom right
+extern void draw_quad_atlas(BatchRenderer* br, Quad quad, WDL_Vec2 uvs[2], Camera cam);
 
 #endif // RENDERER_H
