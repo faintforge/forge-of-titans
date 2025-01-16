@@ -213,7 +213,8 @@ i32 main(void) {
 
     WDL_Scratch scratch = wdl_scratch_begin(&arena, 1);
     WDL_Str vertex_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/batch.vert.glsl"));
-    WDL_Str fragment_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/batch.frag.glsl"));
+    WDL_Str fragment_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/geometry.frag.glsl"));
+
     GfxShader geometry_shader = gfx_shader_new(vertex_source, fragment_source);
     gfx_shader_use(geometry_shader);
     i32 samplers[32] = {0};
@@ -221,6 +222,12 @@ i32 main(void) {
         samplers[i] = i;
     }
     gfx_shader_uniform_i32_arr(geometry_shader, wdl_str_lit("textures"), samplers, wdl_arrlen(samplers));
+
+    fragment_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/text.frag.glsl"));
+    GfxShader text_shader = gfx_shader_new(vertex_source, fragment_source);
+    gfx_shader_use(text_shader);
+    gfx_shader_uniform_i32_arr(text_shader, wdl_str_lit("textures"), samplers, wdl_arrlen(samplers));
+
     wdl_scratch_end(scratch);
 
     GfxTexture checker_texture;
@@ -326,7 +333,7 @@ i32 main(void) {
             .zoom = screen_size.y,
             .pos = wdl_v2(screen_size.x / 2.0f, -screen_size.y / 2.0f),
         };
-        batch_begin(br, geometry_shader);
+        batch_begin(br, text_shader);
 
         FontMetrics metrics = font_get_metrics(font, font_size);
         WDL_Str str = wdl_str_lit("Forge of Titans");
@@ -337,11 +344,12 @@ i32 main(void) {
             u8 codepoint = str.data[i];
             Glyph glyph = font_get_glyph(font, codepoint, font_size);
             WDL_Vec2 gpos = wdl_v2_add(pos, glyph.offset);
+            gpos.y += sinf(-wdl_os_get_time() * 2.0f + i / 5.0f) * metrics.ascent / 2.0f;
             draw_quad_atlas(br, (Quad) {
                     .pos = gpos,
                     .size = glyph.size,
                     .texture = font_get_atlas(font, font_size),
-                    .color = GFX_COLOR_WHITE,
+                    .color = gfx_color_hsv(-wdl_os_get_time() * 90.0f + i * 5.0f, 0.75f, 1.0f),
                     .pivot = wdl_v2(-0.5f, 0.5f),
                 }, glyph.uv, ui_cam);
             pos.x += glyph.advance;
