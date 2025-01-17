@@ -250,9 +250,9 @@ void draw_quad_atlas(BatchRenderer* br, Quad quad, WDL_Vec2 uvs[2], Camera cam) 
     for (u8 i = 0; i < 4; i++) {
         WDL_Vec2 pos = vert_pos[i];
         pos = wdl_v2_sub(pos, quad.pivot);
+        pos = wdl_v2_mul(pos, quad.size);
         pos = wdl_v2(pos.x * cosf(quad.rotation) - pos.y * sinf(quad.rotation),
             pos.x * sinf(quad.rotation) + pos.y * cosf(quad.rotation));
-        pos = wdl_v2_mul(pos, quad.size);
         pos = wdl_v2_add(pos, quad.pos);
 
         WDL_Vec4 pos_v4 = wdl_v4(pos.x, pos.y, 0.0f, 1.0f);
@@ -268,4 +268,96 @@ void draw_quad_atlas(BatchRenderer* br, Quad quad, WDL_Vec2 uvs[2], Camera cam) 
     }
 
     br->curr_quad++;
+}
+
+// -- Debug --------------------------------------------------------------------
+
+static DebugCtx* debug_curr_ctx = NULL;
+
+void debug_ctx_push(DebugCtx* ctx) {
+    if (debug_curr_ctx != NULL) {
+        ctx->_next = debug_curr_ctx;
+    }
+    debug_curr_ctx = ctx;
+}
+
+void debug_ctx_pop(void) {
+    if (debug_curr_ctx == NULL) {
+        wdl_error("Debug context popped too many times.");
+        return;
+    }
+    debug_curr_ctx = debug_curr_ctx->_next;
+}
+
+void debug_ctx_execute(const DebugCtx* ctx, BatchRenderer* br) {
+    DebugDrawCmd* cmd = ctx->_first_cmd;
+    while (cmd != NULL) {
+        draw_quad(br, cmd->quad, cmd->cam);
+        cmd = cmd->next;
+    }
+}
+
+void debug_ctx_reset(DebugCtx* ctx) {
+    ctx->_first_cmd = NULL;
+    ctx->_last_cmd = NULL;
+}
+
+void debug_draw_quad(Quad quad, Camera cam) {
+    if (debug_curr_ctx == NULL) {
+        wdl_error("No debug context active.");
+        return;
+    }
+
+    DebugDrawCmd* cmd = wdl_arena_push_no_zero(debug_curr_ctx->arena, sizeof(DebugDrawCmd));
+    *cmd = (DebugDrawCmd) {
+        .quad = quad,
+        .cam = cam,
+    };
+
+    if (debug_curr_ctx->_first_cmd == NULL) {
+        debug_curr_ctx->_first_cmd = debug_curr_ctx->_last_cmd = cmd;
+    } else {
+        debug_curr_ctx->_last_cmd->next = cmd;
+        debug_curr_ctx->_last_cmd = cmd;
+    }
+}
+
+static WDL_Vec2 vec2_rotate(WDL_Vec2 vec, f32 angle) {
+    return wdl_v2(vec.x * cosf(angle) - vec.y * sinf(angle),
+        vec.x * sinf(angle) + vec.y * cosf(angle));
+}
+
+void debug_draw_quad_outline(Quad quad, Camera cam) {
+    WDL_Vec2 bl = wdl_v2_sub(wdl_v2s(-0.5f), quad.pivot);
+    bl = wdl_v2_mul(bl, quad.size);
+    bl = vec2_rotate(bl, quad.rotation);
+    bl = wdl_v2_add(bl, quad.pos);
+
+    WDL_Vec2 tr = wdl_v2_sub(wdl_v2s(0.5f), quad.pivot);
+    tr = wdl_v2_mul(tr, quad.size);
+    tr = vec2_rotate(tr, quad.rotation);
+    tr = wdl_v2_add(tr, quad.pos);
+
+    const f32 QUARTER_TURN = 3.14f / 2.0f;
+    debug_draw_line_angle(bl, quad.rotation, -quad.size.x, quad.color, cam);
+    debug_draw_line_angle(tr, quad.rotation, quad.size.x, quad.color, cam);
+    debug_draw_line_angle(bl, quad.rotation + QUARTER_TURN, -quad.size.y, quad.color, cam);
+    debug_draw_line_angle(tr, quad.rotation - QUARTER_TURN, -quad.size.y, quad.color, cam);
+}
+
+void debug_draw_line(WDL_Vec2 a, WDL_Vec2 b, GfxColor color, Camera cam) {
+    WDL_Vec2 diff = wdl_v2_sub(a, b);
+    f32 angle = atan2f(diff.y, diff.x);
+    debug_draw_line_angle(a, angle, wdl_v2_magnitude(diff), color, cam);
+}
+
+void debug_draw_line_angle(WDL_Vec2 pos, f32 angle, f32 length, GfxColor color, Camera cam) {
+    Quad quad = {
+        .pos = pos,
+        .color = color,
+        .size = wdl_v2(length, cam.zoom / cam.screen_size.y),
+        .pivot = wdl_v2(0.5f, 0.0f),
+        .rotation = angle,
+    };
+    debug_draw_quad(quad, cam);
 }

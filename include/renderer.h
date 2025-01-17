@@ -81,4 +81,33 @@ extern void draw_quad(BatchRenderer* br, Quad quad, Camera cam);
 // uvs[1] = Bottom right
 extern void draw_quad_atlas(BatchRenderer* br, Quad quad, WDL_Vec2 uvs[2], Camera cam);
 
+// -- Debug --------------------------------------------------------------------
+
+typedef struct DebugDrawCmd DebugDrawCmd;
+struct DebugDrawCmd {
+    DebugDrawCmd* next;
+    Quad quad;
+    Camera cam;
+};
+
+typedef struct DebugCtx DebugCtx;
+struct DebugCtx {
+    WDL_Arena* arena;
+
+    DebugCtx* _next;
+    DebugDrawCmd* _first_cmd;
+    DebugDrawCmd* _last_cmd;
+};
+
+extern void debug_ctx_push(DebugCtx* ctx);
+extern void debug_ctx_pop(void);
+extern void debug_ctx_execute(const DebugCtx* ctx, BatchRenderer* br);
+extern void debug_ctx_reset(DebugCtx* ctx);
+
+extern void debug_draw_quad(Quad quad, Camera cam);
+extern void debug_draw_quad_outline(Quad quad, Camera cam);
+
+extern void debug_draw_line(WDL_Vec2 a, WDL_Vec2 b, GfxColor color, Camera cam);
+extern void debug_draw_line_angle(WDL_Vec2 pos, f32 angle, f32 length, GfxColor color, Camera cam);
+
 #endif // RENDERER_H

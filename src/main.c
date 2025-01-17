@@ -303,12 +303,56 @@ i32 main(void) {
 
     // -------------------------------------------------------------------------
 
+    WDL_Arena* frame_arena = wdl_arena_create();
+    DebugCtx dbg = {
+        .arena = frame_arena,
+    };
+
     u32 fps = 0;
     f32 fps_timer = 0.0f;
 
     f32 last = 0.0f;
     u32 frame = 0;
     while (window_is_open(window)) {
+        wdl_arena_clear(frame_arena);
+        debug_ctx_push(&dbg);
+
+        // debug_draw_quad((Quad) {
+        //         .size = wdl_v2s(1.0f),
+        //         .color = GFX_COLOR_RED,
+        //         .rotation = 3.14 / 4.0f,
+        //     }, camera);
+
+        debug_draw_line(wdl_v2s(0.0f), wdl_v2s(1.0f), GFX_COLOR_RED, camera);
+        debug_draw_line_angle(wdl_v2s(0.0f), wdl_os_get_time(), 1.0f, GFX_COLOR_RED, camera);
+
+        debug_draw_quad((Quad) {
+                .pos = wdl_v2s(0.0f),
+                .size = wdl_v2(0.2f, 0.2f),
+                .color = GFX_COLOR_GREEN,
+            }, camera);
+
+        debug_draw_quad((Quad) {
+                .pos = wdl_v2s(1.0f),
+                .size = wdl_v2(0.2f, 0.2f),
+                .color = GFX_COLOR_GREEN,
+            }, camera);
+
+        debug_draw_quad((Quad) {
+                .pos = wdl_v2(7.0f, 0.0f),
+                .size = wdl_v2(0.1f, 0.1f),
+                .color = GFX_COLOR_WHITE,
+                .rotation = wdl_os_get_time(),
+                .pivot = wdl_v2s(0.25f),
+            }, camera);
+        debug_draw_quad_outline((Quad) {
+                .pos = wdl_v2(7.0f, 0.0f),
+                .size = wdl_v2(1.0f, 2.0f),
+                .color = GFX_COLOR_GREEN,
+                .rotation = wdl_os_get_time(),
+                .pivot = wdl_v2s(0.25f),
+            }, camera);
+
         profiler_begin_frame(frame);
         prof_begin(wdl_str_lit("MainLoop"));
         f32 curr = wdl_os_get_time();
@@ -355,6 +399,8 @@ i32 main(void) {
             pos.x += glyph.advance;
         }
 
+        debug_ctx_execute(&dbg, br);
+        debug_ctx_reset(&dbg);
         batch_end(br);
 
         prof_end();
