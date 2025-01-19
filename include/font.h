@@ -32,4 +32,6 @@ extern Glyph       font_get_glyph(Font* font, u32 codepoint);
 extern GfxTexture  font_get_atlas(const Font* font);
 extern FontMetrics font_get_metrics(const Font* font);
 
+extern void debug_font_atlas(const Font* font, Quad quad, Camera cam);
+
 #endif // FONT_H

@@ -22,16 +22,18 @@ typedef struct QuadtreeAtlas QuadtreeAtlas;
 struct QuadtreeAtlas {
     WDL_Arena* arena;
     QuadtreeAtlasNode root;
+    WDL_Ivec2 size;
     u8* bitmap;
 };
 
-QuadtreeAtlas quadtree_atlas_init(WDL_Arena* arena) {
+QuadtreeAtlas quadtree_atlas_init(WDL_Arena* arena, WDL_Ivec2 size) {
     QuadtreeAtlas atlas = {
         .arena = arena,
         .root = {
-            .size = wdl_iv2(1024, 1024),
+            .size = size,
         },
-        .bitmap = wdl_arena_push(arena, 1024*1024),
+        .size = size,
+        .bitmap = wdl_arena_push(arena, size.x * size.y),
     };
     return atlas;
 }
@@ -148,9 +150,9 @@ void quadtree_atlas_debug_draw_helper(WDL_Ivec2 atlas_size, QuadtreeAtlasNode* n
     debug_draw_quad_outline((Quad) {
             .pos = pos,
             .size = size,
-            .color = GFX_COLOR_WHITE,
+            .color = gfx_color_rgb_hex(0x808080),
             .pivot = wdl_v2(-0.5f, 0.5f),
-            }, cam);
+        }, cam);
 
     if (node->split) {
         for (u8 i = 0; i < 4; i++) {
@@ -296,19 +298,24 @@ struct Font {
 
 SizedFont sized_font_create(Font* font, u32 size) {
     void* internal = font->provider.init(font->arena, font->ttf_data);
+    WDL_Ivec2 atlas_size = wdl_iv2(256, 256);
+    // Provide a buffer with zeros so the texture is properly cleared.
+    WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
+    u8* zero_buffer = wdl_arena_push(scratch.arena, atlas_size.x * atlas_size.y);
     SizedFont sized = {
         .internal = internal,
         .size = size,
-        .atlas_packer = quadtree_atlas_init(font->arena),
+        .atlas_packer = quadtree_atlas_init(font->arena, atlas_size),
         .atlas_texture = gfx_texture_new((GfxTextureDesc) {
-                .size = wdl_iv2(1024, 1024),
-                .data = NULL,
+                .data = zero_buffer,
+                .size = atlas_size,
                 .format = GFX_TEXTURE_FORMAT_R_U8,
                 .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
             }),
         .glyph_map = wdl_hm_new(wdl_hm_desc_generic(font->arena, 32, u32, Glyph)),
         .metrics = font->provider.get_metrics(internal, size),
     };
+    wdl_scratch_end(scratch);
     return sized;
 }
 
@@ -362,8 +369,9 @@ Glyph font_get_glyph(Font* font, u32 codepoint) {
         });
     wdl_scratch_end(scratch);
 
-    WDL_Vec2 uv_tl = wdl_v2_div(wdl_v2(node->pos.x, node->pos.y), wdl_v2(1024, 1024));
-    WDL_Vec2 uv_br = wdl_v2_div(wdl_v2(node->pos.x + fp_glyph.size.x, node->pos.y + fp_glyph.size.y), wdl_v2(1024, 1024));
+    WDL_Vec2 atlas_size = wdl_v2(sized->atlas_packer.size.x, sized->atlas_packer.size.y);
+    WDL_Vec2 uv_tl = wdl_v2_div(wdl_v2(node->pos.x, node->pos.y), atlas_size);
+    WDL_Vec2 uv_br = wdl_v2_div(wdl_v2(node->pos.x + fp_glyph.size.x, node->pos.y + fp_glyph.size.y), atlas_size);
     Glyph glyph = {
         .size = fp_glyph.size,
         .uv = {uv_tl, uv_br},
@@ -394,4 +402,14 @@ FontMetrics font_get_metrics(const Font* font) {
     }
 
     return sized->metrics;
+}
+
+void debug_font_atlas(const Font* font, Quad quad, Camera cam) {
+    SizedFont* sized = wdl_hm_getp(font->map, font->curr_size);
+    if (sized == NULL) {
+        wdl_error("Font of size %u hasn't been created.", font->curr_size);
+        return;
+    }
+
+    quadtree_atlas_debug_draw(sized->atlas_packer, quad, cam);
 }
