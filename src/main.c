@@ -307,16 +307,10 @@ i32 main(void) {
     // -------------------------------------------------------------------------
 
     QuadtreeAtlas atlas = quadtree_atlas_init(arena);
-
-    FT_Library lib;
-    FT_Init_FreeType(&lib);
-
-    FT_Face face;
-    FT_New_Face(lib, "assets/fonts/Roboto/Roboto-Regular.ttf", 0, &face);
+    FontProvider ft2 = font_provider_get_ft2();
+    void* font = ft2.init(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"));
 
     u32 font_size = 16;
-    FT_Set_Pixel_Sizes(face, 0, font_size);
-
     u32 c = 0;
     u32 chars[256] = {0};
     chars[0] = L'Å';
@@ -365,15 +359,12 @@ i32 main(void) {
 
         c_timer += dt;
         if (chars[c] != 0 && c_timer >= 0.0f) {
-            FT_Load_Char(face, chars[c], FT_LOAD_DEFAULT);
-            FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
-            FT_Bitmap bm = face->glyph->bitmap;
-            WDL_Ivec2 size = wdl_iv2(bm.width, bm.rows);
-            QuadtreeAtlasNode* node = quadtree_atlas_insert(&atlas, size);
+            FPGlyph glyph = ft2.get_glyph(font, NULL, chars[c], font_size);
+            QuadtreeAtlasNode* node = quadtree_atlas_insert(&atlas, glyph.bitmap.size);
 
             gfx_texture_subdata(atlas_texture, (GfxTextureSubDataDesc) {
-                    .data = bm.buffer,
-                    .size = wdl_iv2(bm.width, bm.rows),
+                    .data = glyph.bitmap.buffer,
+                    .size = glyph.bitmap.size,
                     .format = GFX_TEXTURE_FORMAT_R_U8,
                     .pos = node->pos,
                     .alignment = 1,
@@ -385,7 +376,6 @@ i32 main(void) {
 
         if (chars[c] == 0 && font_size <= 64) {
             font_size *= 2;
-            FT_Set_Pixel_Sizes(face, 0, font_size);
             c = 0;
         }
 
@@ -463,6 +453,7 @@ i32 main(void) {
         profiler_end_frame();
         frame++;
     }
+    ft2.terminate(font);
 
     window_destroy(window);
 

@@ -4,6 +4,27 @@
 #include "waddle.h"
 #include "renderer.h"
 
+// Font provider glyph
+typedef struct FPGlyph FPGlyph;
+struct FPGlyph {
+    struct {
+        u8* buffer;
+        WDL_Ivec2 size;
+    } bitmap;
+    WDL_Vec2 size;
+    WDL_Vec2 offset;
+    f32 advance;
+};
+
+typedef struct FontProvider FontProvider;
+struct FontProvider {
+    void* (*init)(WDL_Arena* arena, WDL_Str filename);
+    void (*terminate)(void* internal);
+    FPGlyph (*get_glyph)(void* internal, WDL_Arena* arena, u32 codepoint, u32 size);
+};
+
+extern FontProvider font_provider_get_ft2(void);
+
 typedef struct QuadtreeAtlasNode QuadtreeAtlasNode;
 struct QuadtreeAtlasNode {
     QuadtreeAtlasNode* children;

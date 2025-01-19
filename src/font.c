@@ -1,4 +1,5 @@
 #include "font.h"
+#include "freetype/freetype.h"
 #include "renderer.h"
 #include "waddle.h"
 
@@ -145,4 +146,66 @@ void quadtree_atlas_debug_draw(QuadtreeAtlas atlas, Quad quad, Camera cam) {
             .texture = quad.texture,
         }, cam);
     quadtree_atlas_debug_draw_helper(atlas.root.size, &atlas.root, quad, cam);
+}
+
+// -- FreeType2 font provider --------------------------------------------------
+
+typedef struct FT2Internal FT2Internal;
+struct FT2Internal {
+    FT_Library lib;
+    FT_Face face;
+};
+
+static void* ft2_init(WDL_Arena*arena, WDL_Str filename) {
+    FT2Internal* internal = wdl_arena_push_no_zero(arena, sizeof(FT2Internal));
+    FT_Init_FreeType(&internal->lib);
+
+    WDL_Scratch scratch = wdl_scratch_begin(&arena, 1);
+    const char* cstr = wdl_str_to_cstr(scratch.arena, filename);
+    FT_New_Face(internal->lib, cstr, 0, &internal->face);
+    wdl_scratch_end(scratch);
+
+    return internal;
+}
+
+static void ft2_terminate(void* internal) {
+    FT2Internal* ft2 = internal;
+    FT_Done_Face(ft2->face);
+    FT_Done_FreeType(ft2->lib);
+}
+
+static FPGlyph ft2_get_glyph(void* internal, WDL_Arena* arena, u32 codepoint, u32 size) {
+    (void) arena;
+
+    FT2Internal* ft2 = internal;
+    FT_Face face = ft2->face;
+    FT_Set_Pixel_Sizes(face, 0, size);
+
+    FT_Load_Char(face, codepoint, FT_LOAD_RENDER);
+    FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
+    FT_GlyphSlot slot = face->glyph;
+    FT_Bitmap bm = slot->bitmap;
+    FT_Glyph_Metrics metrics = slot->metrics;
+
+    FPGlyph glyph = {
+        .bitmap = {
+            .size = wdl_iv2(bm.width, bm.rows),
+            .buffer = bm.buffer,
+        },
+        .size = wdl_v2(metrics.width >> 6, metrics.height >> 6),
+        .offset = wdl_v2(metrics.horiBearingX >> 6, metrics.horiBearingY >> 6),
+        .advance = metrics.horiAdvance >> 6,
+    };
+
+    return glyph;
+}
+
+static const FontProvider FT2_PROVIDER = {
+    .init = ft2_init,
+    .terminate = ft2_terminate,
+    .get_glyph = ft2_get_glyph,
+};
+
+FontProvider font_provider_get_ft2(void) {
+    return FT2_PROVIDER;
 }
