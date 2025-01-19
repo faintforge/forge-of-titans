@@ -8,6 +8,9 @@
 #include "profiler.h"
 #include "font.h"
 
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
 typedef struct State State;
 struct State {
     RenderPipeline pipeline;
@@ -172,7 +175,7 @@ i32 main(void) {
     prof_begin(wdl_str_lit("Window creation"));
     Window* window = window_create(arena, (WindowDesc) {
             .title = "Forge of Titans",
-            .size = wdl_iv2(800, 600),
+            .size = wdl_iv2(1280, 1024),
             .resize_cb = resize_cb,
             .resizable = false,
             .vsync = true,
@@ -196,15 +199,15 @@ i32 main(void) {
     }
     prof_end();
 
-    prof_begin(wdl_str_lit("Font create"));
-    const u32 font_size = 64;
-    Font* roboto = font_init_file(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"), false);
-    Font* spline_sans = font_init_file(arena, wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"), false);
-    Font* tiny5 = font_init_file(arena, wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"), false);
-    Font* soulside = font_init_file(arena, wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"), false);
-    Font* font = soulside;
-    font_cache_size(font, font_size);
-    prof_end();
+    // prof_begin(wdl_str_lit("Font create"));
+    // const u32 font_size = 64;
+    // Font* roboto = font_init_file(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"), false);
+    // Font* spline_sans = font_init_file(arena, wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"), false);
+    // Font* tiny5 = font_init_file(arena, wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"), false);
+    // Font* soulside = font_init_file(arena, wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"), false);
+    // Font* font = soulside;
+    // font_cache_size(font, font_size);
+    // prof_end();
 
     // -------------------------------------------------------------------------
 
@@ -303,6 +306,35 @@ i32 main(void) {
 
     // -------------------------------------------------------------------------
 
+    QuadtreeAtlas atlas = quadtree_atlas_init(arena);
+
+    FT_Library lib;
+    FT_Init_FreeType(&lib);
+
+    FT_Face face;
+    FT_New_Face(lib, "assets/fonts/Roboto/Roboto-Regular.ttf", 0, &face);
+
+    u32 font_size = 16;
+    FT_Set_Pixel_Sizes(face, 0, font_size);
+
+    u32 c = 0;
+    u32 chars[256] = {0};
+    chars[0] = L'Å';
+    chars[1] = L'Ä';
+    chars[2] = L'Ö';
+    for (u32 i = 32; i <= 126; i++) {
+        chars[i - 32 + 3] = i;
+    }
+
+    f32 c_timer = 0.0f;
+
+    GfxTexture atlas_texture = gfx_texture_new((GfxTextureDesc) {
+            .data = atlas.bitmap,
+            .size = atlas.root.size,
+            .format = GFX_TEXTURE_FORMAT_R_U8,
+            .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
+        });
+
     WDL_Arena* frame_arena = wdl_arena_create();
     DebugCtx dbg = {
         .arena = frame_arena,
@@ -314,45 +346,6 @@ i32 main(void) {
     f32 last = 0.0f;
     u32 frame = 0;
     while (window_is_open(window)) {
-        wdl_arena_clear(frame_arena);
-        debug_ctx_push(&dbg);
-
-        // debug_draw_quad((Quad) {
-        //         .size = wdl_v2s(1.0f),
-        //         .color = GFX_COLOR_RED,
-        //         .rotation = 3.14 / 4.0f,
-        //     }, camera);
-
-        debug_draw_line(wdl_v2s(0.0f), wdl_v2s(1.0f), GFX_COLOR_RED, camera);
-        debug_draw_line_angle(wdl_v2s(0.0f), wdl_os_get_time(), 1.0f, GFX_COLOR_RED, camera);
-
-        debug_draw_quad((Quad) {
-                .pos = wdl_v2s(0.0f),
-                .size = wdl_v2(0.2f, 0.2f),
-                .color = GFX_COLOR_GREEN,
-            }, camera);
-
-        debug_draw_quad((Quad) {
-                .pos = wdl_v2s(1.0f),
-                .size = wdl_v2(0.2f, 0.2f),
-                .color = GFX_COLOR_GREEN,
-            }, camera);
-
-        debug_draw_quad((Quad) {
-                .pos = wdl_v2(7.0f, 0.0f),
-                .size = wdl_v2(0.1f, 0.1f),
-                .color = GFX_COLOR_WHITE,
-                .rotation = wdl_os_get_time(),
-                .pivot = wdl_v2s(0.25f),
-            }, camera);
-        debug_draw_quad_outline((Quad) {
-                .pos = wdl_v2(7.0f, 0.0f),
-                .size = wdl_v2(1.0f, 2.0f),
-                .color = GFX_COLOR_GREEN,
-                .rotation = wdl_os_get_time(),
-                .pivot = wdl_v2s(0.25f),
-            }, camera);
-
         profiler_begin_frame(frame);
         prof_begin(wdl_str_lit("MainLoop"));
         f32 curr = wdl_os_get_time();
@@ -367,6 +360,65 @@ i32 main(void) {
             fps = 0;
         }
 
+        wdl_arena_clear(frame_arena);
+        debug_ctx_push(&dbg);
+
+        c_timer += dt;
+        if (chars[c] != 0 && c_timer >= 0.0f) {
+            FT_Load_Char(face, chars[c], FT_LOAD_DEFAULT);
+            FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
+            FT_Bitmap bm_size = face->glyph->bitmap;
+            WDL_Ivec2 size = wdl_iv2(bm_size.width, bm_size.rows);
+            QuadtreeAtlasNode* node = quadtree_atlas_insert(&atlas, size);
+
+            for (u32 y = 0; y < bm_size.rows; y++) {
+                u8* atlas_bm = &atlas.bitmap[node->pos.x + (node->pos.y + y) * atlas.root.size.x];
+                memcpy(atlas_bm, &bm_size.buffer[y * bm_size.width], bm_size.width);
+            }
+            gfx_texture_resize(atlas_texture, (GfxTextureDesc) {
+                    .data = atlas.bitmap,
+                    .size = atlas.root.size,
+                    .format = GFX_TEXTURE_FORMAT_R_U8,
+                    .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
+                });
+            c_timer = 0.0f;
+            c++;
+        }
+
+        if (chars[c] == 0 && font_size <= 64) {
+            font_size *= 2;
+            FT_Set_Pixel_Sizes(face, 0, font_size);
+            c = 0;
+        }
+
+        Camera dbg_cam = {
+            .zoom = 1.0f,
+            .screen_size = window_get_size(window),
+        };
+        // debug_draw_quad((Quad) {
+        //         .size = wdl_v2(3.0f, 3.0f),
+        //         .pivot = wdl_v2(-0.5f, 0.5f),
+        //         .color = GFX_COLOR_BLUE,
+        //     }, camera);
+        // debug_draw_quad_outline((Quad) {
+        //         .size = wdl_v2((32.0f / 256.0f) * 3.0f, 32.0f / 256.0f * 3.0f),
+        //         .pivot = wdl_v2(-0.5f, 0.5f),
+        //         .color = GFX_COLOR_WHITE,
+        //     }, camera);
+
+        debug_draw_quad((Quad) {
+                .size = wdl_v2(1.0f, 1.0f),
+                .color = GFX_COLOR_WHITE,
+                .texture = atlas_texture,
+            }, dbg_cam);
+
+        // quadtree_atlas_debug_draw(atlas, (Quad) {
+        //         .pos = wdl_v2(-0.45f, 0.45f),
+        //         .size = wdl_v2(0.9f, 0.9f),
+        //         .color = GFX_COLOR_WHITE,
+        //         .texture = atlas_texture,
+        //     }, dbg_cam);
+
         prof_begin(wdl_str_lit("Rendering"));
         camera.screen_size = window_get_size(window);
         render_pipeline_execute(&state.pipeline);
@@ -379,25 +431,25 @@ i32 main(void) {
         };
         batch_begin(br, text_shader);
 
-        FontMetrics metrics = font_get_metrics(font, font_size);
-        WDL_Str str = wdl_str_lit("Forge of Titans");
-        WDL_Vec2 pos = wdl_v2s(16.0f);
-        pos.y += metrics.ascent;
-        pos.y = -pos.y;
-        for (u32 i = 0; i < str.len; i++) {
-            u8 codepoint = str.data[i];
-            Glyph glyph = font_get_glyph(font, codepoint, font_size);
-            WDL_Vec2 gpos = wdl_v2_add(pos, glyph.offset);
-            gpos.y += sinf(-wdl_os_get_time() * 2.0f + i / 5.0f) * metrics.ascent / 2.0f;
-            draw_quad_atlas(br, (Quad) {
-                    .pos = gpos,
-                    .size = glyph.size,
-                    .texture = font_get_atlas(font, font_size),
-                    .color = gfx_color_hsv(-wdl_os_get_time() * 90.0f + i * 5.0f, 0.75f, 1.0f),
-                    .pivot = wdl_v2(-0.5f, 0.5f),
-                }, glyph.uv, ui_cam);
-            pos.x += glyph.advance;
-        }
+        // FontMetrics metrics = font_get_metrics(font, font_size);
+        // WDL_Str str = wdl_str_lit("Forge of Titans");
+        // WDL_Vec2 pos = wdl_v2s(16.0f);
+        // pos.y += metrics.ascent;
+        // pos.y = -pos.y;
+        // for (u32 i = 0; i < str.len; i++) {
+        //     u8 codepoint = str.data[i];
+        //     Glyph glyph = font_get_glyph(font, codepoint, font_size);
+        //     WDL_Vec2 gpos = wdl_v2_add(pos, glyph.offset);
+        //     gpos.y += sinf(-wdl_os_get_time() * 2.0f + i / 5.0f) * metrics.ascent / 2.0f;
+        //     draw_quad_atlas(br, (Quad) {
+        //             .pos = gpos,
+        //             .size = glyph.size,
+        //             .texture = font_get_atlas(font, font_size),
+        //             .color = gfx_color_hsv(-wdl_os_get_time() * 90.0f + i * 5.0f, 0.75f, 1.0f),
+        //             .pivot = wdl_v2(-0.5f, 0.5f),
+        //         }, glyph.uv, ui_cam);
+        //     pos.x += glyph.advance;
+        // }
 
         debug_ctx_execute(&dbg, br);
         debug_ctx_reset(&dbg);

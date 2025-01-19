@@ -1,182 +1,148 @@
 #include "font.h"
-#include "graphics.h"
-#include "utils.h"
+#include "renderer.h"
 #include "waddle.h"
 
-#include <ft2build.h>
-#include FT_FREETYPE_H
-
-#define ASCII_FIRST_CHAR 32
-#define ASCII_LAST_CHAR 126
-
-// -- Font with fixed size -----------------------------------------------------
-
-#define INITIAL_ATLAS_SIZE wdl_iv2(512, 512)
-
-typedef struct Atlas Atlas;
-struct Atlas {
-    u8* data;
-    WDL_Ivec2 size;
-    GfxTexture texture;
-
-    u32 row_height;
-    WDL_Ivec2 curr_pos;
-};
-
-typedef struct SizedFont SizedFont;
-struct SizedFont {
-    FontMetrics metrics;
-    u32 size;
-    Atlas atlas;
-    // Key: u32 (codepoint)
-    // Value: Glyph
-    WDL_HashMap* codepoint_glyph_map;
-};
-
-typedef struct SizedFontMap SizedFontMap;
-struct SizedFontMap {
-    WDL_Arena* arena;
-    SizedFont* buckets;
-    u32 capacity;
-};
-
-struct Font {
-    WDL_Arena* arena;
-    WDL_Str ttf_data;
-    b8 sdf;
-
-    // Key: u32 (size)
-    // Value: SizedFont
-    WDL_HashMap* map;
-};
-
-static SizedFont sized_font_init(Font* font, u32 size) {
-    WDL_Str ttf_data = font->ttf_data;
-
-    FT_Library lib;
-    FT_Init_FreeType(&lib);
-
-    FT_Face face;
-    FT_New_Memory_Face(lib, ttf_data.data, ttf_data.len, 0, &face);
-
-    FT_Set_Pixel_Sizes(face, 0, size);
-
-    FT_Size_Metrics face_metrics = face->size->metrics;
-    SizedFont sized = {
-        .metrics = {
-            .ascent = face_metrics.ascender >> 6,
-            .descent = face_metrics.descender >> 6,
-            .line_gap = face_metrics.height >> 6,
-        },
-        .size = size,
-        .codepoint_glyph_map = wdl_hm_new(wdl_hm_desc_generic(font->arena, 256, u32, Glyph)),
-    };
-
-    Atlas atlas = {
-        .data = wdl_arena_push(font->arena, INITIAL_ATLAS_SIZE.x*INITIAL_ATLAS_SIZE.y),
-        .size = INITIAL_ATLAS_SIZE,
-    };
-    for (u32 codepoint = ASCII_FIRST_CHAR; codepoint <= ASCII_LAST_CHAR; codepoint++) {
-        u32 glyph_index = FT_Get_Char_Index(face, codepoint);
-        FT_Load_Glyph(face, glyph_index, FT_LOAD_DEFAULT);
-        FT_Render_Mode mode = !font->sdf ? FT_RENDER_MODE_NORMAL : FT_RENDER_MODE_SDF;
-        FT_Render_Glyph(face->glyph, mode);
-
-        FT_Bitmap bitmap = face->glyph->bitmap;
-
-        if (atlas.curr_pos.x + (i32) bitmap.width > atlas.size.x) {
-            atlas.curr_pos.x = 0;
-            atlas.curr_pos.y += atlas.row_height;
-            atlas.row_height = 0;
-        }
-
-        for (u32 y = 0; y < bitmap.rows; y++) {
-            for (u32 x = 0; x < bitmap.width; x++) {
-                WDL_Ivec2 bitmap_pos = wdl_iv2(x, y);
-                WDL_Ivec2 atlas_pos = wdl_iv2_add(atlas.curr_pos, bitmap_pos);
-
-                atlas.data[atlas_pos.x + atlas_pos.y * atlas.size.x] = bitmap.buffer[bitmap_pos.x + bitmap_pos. y * bitmap.width];
-            }
-        }
-
-        FT_Glyph_Metrics glyph_metrics = face->glyph->metrics;
-        WDL_Vec2 nw = wdl_v2(atlas.curr_pos.x, atlas.curr_pos.y);
-        WDL_Vec2 se = wdl_v2(atlas.curr_pos.x + bitmap.width, atlas.curr_pos.y + bitmap.rows);
-        WDL_Vec2 atlas_size = wdl_v2(atlas.size.x, atlas.size.y);
-        nw = wdl_v2_div(nw, atlas_size);
-        se = wdl_v2_div(se, atlas_size);
-        Glyph glyph = {
-            .advance = glyph_metrics.horiAdvance >> 6,
-            .size = wdl_v2(glyph_metrics.width >> 6, glyph_metrics.height >> 6),
-            .offset = wdl_v2(glyph_metrics.horiBearingX >> 6, glyph_metrics.horiBearingY >> 6),
-            .uv = {
-                [0] = nw,
-                [1] = se,
-            },
-        };
-        wdl_hm_insert(sized.codepoint_glyph_map, codepoint, glyph);
-
-        atlas.curr_pos.x += bitmap.width;
-        atlas.row_height = wdl_max(atlas.row_height, bitmap.rows);
-    }
-
-    atlas.texture = gfx_texture_new((GfxTextureDesc) {
-            .data = atlas.data,
-            .size = atlas.size,
-            .format = GFX_TEXTURE_FORMAT_R_U8,
-            .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
-        });
-
-    sized.atlas = atlas;
-
-    FT_Done_Face(face);
-    FT_Done_FreeType(lib);
-
-    return sized;
-}
-
-Font* font_init(WDL_Arena* arena, WDL_Str ttf_data, b8 sdf) {
-    Font* font = wdl_arena_push_no_zero(arena, sizeof(Font));
-    *font = (Font) {
+QuadtreeAtlas quadtree_atlas_init(WDL_Arena* arena) {
+    QuadtreeAtlas atlas = {
         .arena = arena,
-        .ttf_data = ttf_data,
-        .sdf = sdf,
-        .map = wdl_hm_new(wdl_hm_desc_generic(arena, 32, u32, SizedFont)),
+        .root = {
+            .size = wdl_iv2(1024, 1024),
+        },
+        .bitmap = wdl_arena_push(arena, 1024*1024),
     };
-
-    return font;
+    return atlas;
 }
 
-Font* font_init_file(WDL_Arena* arena, WDL_Str filename, b8 sdf) {
-    WDL_Str ttf_data = read_file(arena, filename);
-    return font_init(arena, ttf_data, sdf);
+u32 align_value_up(u32 value, u32 align) {
+    u64 aligned = value + align - 1;
+    u64 mod = aligned % align;
+    aligned = aligned - mod;
+    return aligned;
 }
 
-void font_cache_size(Font* font, u32 size) {
-    if (!wdl_hm_has(font->map, size)) {
-        SizedFont sized = sized_font_init(font, size);
-        wdl_hm_insert(font->map, size, sized);
+QuadtreeAtlasNode* quadtree_atlas_insert_helper(WDL_Arena* arena, QuadtreeAtlasNode* node, WDL_Ivec2 size) {
+    if (node == NULL || node->occupied || node->size.x < size.x || node->size.y < size.y) {
+        return NULL;
+    }
+
+    if (!node->split) {
+        if (node->size.x == size.x && node->size.y == size.y) {
+            node->occupied = true;
+            return node;
+        }
+
+        node->children = wdl_arena_push_no_zero(arena, 4 * sizeof(QuadtreeAtlasNode));
+        node->split = true;
+
+        // Dynamic split
+        if (node->size.x / 2 < size.x || node->size.y / 2 < size.y) {
+            node->children[0] = (QuadtreeAtlasNode) {
+                .size = size,
+                .pos = node->pos,
+                .occupied = true,
+            };
+
+            {
+                WDL_Ivec2 new_size = node->size;
+                new_size.x -= size.x;
+                new_size.y = size.y;
+                WDL_Ivec2 pos = node->pos;
+                pos.x += size.x;
+                node->children[1] = (QuadtreeAtlasNode) {
+                    .size = new_size,
+                    .pos = pos,
+                };
+            }
+
+            {
+                WDL_Ivec2 new_size = node->size;
+                new_size.x = size.x;
+                new_size.y -= size.y;
+                WDL_Ivec2 pos = node->pos;
+                pos.y += size.y;
+                node->children[2] = (QuadtreeAtlasNode) {
+                    .size = new_size,
+                    .pos = pos,
+                };
+            }
+
+            return &node->children[0];
+        }
+
+        WDL_Ivec2 half_size = wdl_iv2_divs(node->size, 2);
+        node->children[0] = (QuadtreeAtlasNode) {
+            .size = half_size,
+                .pos = node->pos,
+        };
+        node->children[1] = (QuadtreeAtlasNode) {
+            .size = half_size,
+                .pos = wdl_iv2(node->pos.x + half_size.x, node->pos.y),
+        };
+        node->children[2] = (QuadtreeAtlasNode) {
+            .size = half_size,
+                .pos = wdl_iv2(node->pos.x, node->pos.y + half_size.y),
+        };
+        node->children[3] = (QuadtreeAtlasNode) {
+            .size = half_size,
+                .pos = wdl_iv2_add(node->pos, half_size),
+        };
+    }
+
+    for (u8 i = 0; i < 4; i++) {
+        QuadtreeAtlasNode* result = quadtree_atlas_insert_helper(arena, &node->children[i], size);
+        if (result != NULL) {
+            return result;
+        }
+    }
+
+    return NULL;
+}
+
+QuadtreeAtlasNode* quadtree_atlas_insert(QuadtreeAtlas* atlas, WDL_Ivec2 size) {
+    size.x = align_value_up(size.x, 4);
+    size.y = align_value_up(size.y, 4);
+    return quadtree_atlas_insert_helper(atlas->arena, &atlas->root, size);
+}
+
+void quadtree_atlas_debug_draw_helper(WDL_Ivec2 atlas_size, QuadtreeAtlasNode* node, Quad quad, Camera cam) {
+    if (node == NULL) {
+        return;
+    }
+
+    WDL_Vec2 size = wdl_v2(
+            (f32) node->size.x / (f32) atlas_size.x,
+            (f32) node->size.y / (f32) atlas_size.y
+        );
+    size = wdl_v2_mul(size, quad.size);
+
+    WDL_Vec2 pos = wdl_v2(
+            (f32) node->pos.x / (f32) atlas_size.x,
+            -(f32) node->pos.y / (f32) atlas_size.y
+        );
+    pos = wdl_v2_mul(pos, quad.size);
+    pos = wdl_v2_add(pos, quad.pos);
+
+    debug_draw_quad_outline((Quad) {
+            .pos = pos,
+            .size = size,
+            .color = GFX_COLOR_WHITE,
+            .pivot = wdl_v2(-0.5f, 0.5f),
+            }, cam);
+
+    if (node->split) {
+        for (u8 i = 0; i < 4; i++) {
+            quadtree_atlas_debug_draw_helper(atlas_size, &node->children[i], quad, cam);
+        }
     }
 }
 
-Glyph font_get_glyph(Font* font, u32 codepoint, u32 size) {
-    SizedFont* sized = wdl_hm_getp(font->map, size);
-    Glyph* g = wdl_hm_getp(sized->codepoint_glyph_map, codepoint);
-    if (g == NULL) {
-        wdl_error("Glyph not found!");
-        return (Glyph) {0};
-    }
-    return *g;
+void quadtree_atlas_debug_draw(QuadtreeAtlas atlas, Quad quad, Camera cam) {
+    debug_draw_quad((Quad) {
+            .pos = quad.pos,
+            .size = quad.size,
+            .pivot = wdl_v2(-0.5f, 0.5f),
+            .color = quad.color,
+            .texture = quad.texture,
+        }, cam);
+    quadtree_atlas_debug_draw_helper(atlas.root.size, &atlas.root, quad, cam);
 }
-
-GfxTexture font_get_atlas(Font* font, u32 size) {
-    SizedFont* sized = wdl_hm_getp(font->map, size);
-    return sized->atlas.texture;
-}
-
-FontMetrics font_get_metrics(Font* font, u32 size) {
-    SizedFont* sized = wdl_hm_getp(font->map, size);
-    return sized->metrics;
-}
-
-WDL_Vec2 font_measure_string(Font* font, WDL_Str str, u32 size);
