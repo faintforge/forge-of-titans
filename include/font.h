@@ -4,45 +4,32 @@
 #include "waddle.h"
 #include "renderer.h"
 
-// Font provider glyph
-typedef struct FPGlyph FPGlyph;
-struct FPGlyph {
-    struct {
-        u8* buffer;
-        WDL_Ivec2 size;
-    } bitmap;
+// -- Forward facing API -------------------------------------------------------
+
+typedef struct Font Font;
+
+typedef struct Glyph Glyph;
+struct Glyph {
     WDL_Vec2 size;
     WDL_Vec2 offset;
     f32 advance;
+    // [0] = Top left
+    // [1] = Bottom right
+    WDL_Vec2 uv[2];
 };
 
-typedef struct FontProvider FontProvider;
-struct FontProvider {
-    void* (*init)(WDL_Arena* arena, WDL_Str filename);
-    void (*terminate)(void* internal);
-    FPGlyph (*get_glyph)(void* internal, WDL_Arena* arena, u32 codepoint, u32 size);
+typedef struct FontMetrics FontMetrics;
+struct FontMetrics {
+    f32 ascent;
+    f32 descent;
+    f32 linegap;
 };
 
-extern FontProvider font_provider_get_ft2(void);
-
-typedef struct QuadtreeAtlasNode QuadtreeAtlasNode;
-struct QuadtreeAtlasNode {
-    QuadtreeAtlasNode* children;
-    WDL_Ivec2 pos;
-    WDL_Ivec2 size;
-    b8 occupied;
-    b8 split;
-};
-
-typedef struct QuadtreeAtlas QuadtreeAtlas;
-struct QuadtreeAtlas {
-    WDL_Arena* arena;
-    QuadtreeAtlasNode root;
-    u8* bitmap;
-};
-
-extern QuadtreeAtlas quadtree_atlas_init(WDL_Arena* arena);
-extern QuadtreeAtlasNode* quadtree_atlas_insert(QuadtreeAtlas* atlas, WDL_Ivec2 size);
-extern void quadtree_atlas_debug_draw(QuadtreeAtlas atlas, Quad quad, Camera cam);
+extern Font*       font_create(WDL_Arena* arena, WDL_Str filename);
+extern void        font_destroy(Font* font);
+extern void        font_set_size(Font* font, u32 size);
+extern Glyph       font_get_glyph(Font* font, u32 codepoint);
+extern GfxTexture  font_get_atlas(const Font* font);
+extern FontMetrics font_get_metrics(const Font* font);
 
 #endif // FONT_H

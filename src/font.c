@@ -1,7 +1,29 @@
 #include "font.h"
-#include "freetype/freetype.h"
+#include "graphics.h"
 #include "renderer.h"
 #include "waddle.h"
+#include "utils.h"
+
+#include <ft2build.h>
+#include FT_FREETYPE_H
+
+// -- Quadtree packer ----------------------------------------------------------
+
+typedef struct QuadtreeAtlasNode QuadtreeAtlasNode;
+struct QuadtreeAtlasNode {
+    QuadtreeAtlasNode* children;
+    WDL_Ivec2 pos;
+    WDL_Ivec2 size;
+    b8 occupied;
+    b8 split;
+};
+
+typedef struct QuadtreeAtlas QuadtreeAtlas;
+struct QuadtreeAtlas {
+    WDL_Arena* arena;
+    QuadtreeAtlasNode root;
+    u8* bitmap;
+};
 
 QuadtreeAtlas quadtree_atlas_init(WDL_Arena* arena) {
     QuadtreeAtlas atlas = {
@@ -148,6 +170,28 @@ void quadtree_atlas_debug_draw(QuadtreeAtlas atlas, Quad quad, Camera cam) {
     quadtree_atlas_debug_draw_helper(atlas.root.size, &atlas.root, quad, cam);
 }
 
+// -- Font providers -----------------------------------------------------------
+
+// Font provider glyph
+typedef struct FPGlyph FPGlyph;
+struct FPGlyph {
+    struct {
+        u8* buffer;
+        WDL_Ivec2 size;
+    } bitmap;
+    WDL_Vec2 size;
+    WDL_Vec2 offset;
+    f32 advance;
+};
+
+typedef struct FontProvider FontProvider;
+struct FontProvider {
+    void* (*init)(WDL_Arena* arena, WDL_Str ttf_data);
+    void (*terminate)(void* internal);
+    FPGlyph (*get_glyph)(void* internal, WDL_Arena* arena, u32 codepoint, u32 size);
+    FontMetrics (*get_metrics)(void* internal, u32 size);
+};
+
 // -- FreeType2 font provider --------------------------------------------------
 
 typedef struct FT2Internal FT2Internal;
@@ -156,14 +200,19 @@ struct FT2Internal {
     FT_Face face;
 };
 
-static void* ft2_init(WDL_Arena*arena, WDL_Str filename) {
+static void* ft2_init(WDL_Arena*arena, WDL_Str ttf_data) {
     FT2Internal* internal = wdl_arena_push_no_zero(arena, sizeof(FT2Internal));
-    FT_Init_FreeType(&internal->lib);
+    FT_Error err = FT_Init_FreeType(&internal->lib);
+    if (err != FT_Err_Ok) {
+        wdl_error("FreeType2 init error!");
+        return NULL;
+    }
 
-    WDL_Scratch scratch = wdl_scratch_begin(&arena, 1);
-    const char* cstr = wdl_str_to_cstr(scratch.arena, filename);
-    FT_New_Face(internal->lib, cstr, 0, &internal->face);
-    wdl_scratch_end(scratch);
+    FT_New_Memory_Face(internal->lib, ttf_data.data, ttf_data.len, 0, &internal->face);
+    if (err != FT_Err_Ok) {
+        wdl_error("FreeType2 face init error!");
+        return NULL;
+    }
 
     return internal;
 }
@@ -200,12 +249,149 @@ static FPGlyph ft2_get_glyph(void* internal, WDL_Arena* arena, u32 codepoint, u3
     return glyph;
 }
 
+static FontMetrics ft2_get_metrics(void* internal, u32 size) {
+    FT2Internal* ft2 = internal;
+    FT_Face face = ft2->face;
+    FT_Set_Pixel_Sizes(face, 0, size);
+    FT_Size_Metrics ft_metrics = face->size->metrics;
+    FontMetrics metrics = {
+        metrics.ascent = ft_metrics.ascender >> 6,
+        metrics.descent = ft_metrics.descender >> 6,
+        metrics.linegap = ft_metrics.height >> 6,
+    };
+    return metrics;
+}
+
 static const FontProvider FT2_PROVIDER = {
     .init = ft2_init,
     .terminate = ft2_terminate,
     .get_glyph = ft2_get_glyph,
+    .get_metrics = ft2_get_metrics,
 };
 
 FontProvider font_provider_get_ft2(void) {
     return FT2_PROVIDER;
+}
+
+// -- Forward facing API -------------------------------------------------------
+
+typedef struct SizedFont SizedFont;
+struct SizedFont {
+    void* internal;
+    u32 size;
+    QuadtreeAtlas atlas_packer;
+    GfxTexture atlas_texture;
+    WDL_HashMap* glyph_map;
+    FontMetrics metrics;
+};
+
+struct Font {
+    WDL_Arena* arena;
+    FontProvider provider;
+    WDL_Str ttf_data;
+
+    u32 curr_size;
+    WDL_HashMap* map;
+};
+
+SizedFont sized_font_create(Font* font, u32 size) {
+    void* internal = font->provider.init(font->arena, font->ttf_data);
+    SizedFont sized = {
+        .internal = internal,
+        .size = size,
+        .atlas_packer = quadtree_atlas_init(font->arena),
+        .atlas_texture = gfx_texture_new((GfxTextureDesc) {
+                .size = wdl_iv2(1024, 1024),
+                .data = NULL,
+                .format = GFX_TEXTURE_FORMAT_R_U8,
+                .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
+            }),
+        .glyph_map = wdl_hm_new(wdl_hm_desc_generic(font->arena, 32, u32, Glyph)),
+        .metrics = font->provider.get_metrics(internal, size),
+    };
+    return sized;
+}
+
+Font* font_create(WDL_Arena* arena, WDL_Str filename) {
+    Font* font = wdl_arena_push_no_zero(arena, sizeof(Font));
+    *font = (Font) {
+        .arena = arena,
+        .provider = FT2_PROVIDER,
+        .ttf_data = read_file(arena, filename),
+        .map = wdl_hm_new(wdl_hm_desc_generic(arena, 32, u32, SizedFont)),
+    };
+    return font;
+}
+
+void font_destroy(Font* font) {
+    WDL_HashMapIter iter = wdl_hm_iter_new(font->map);
+    while (wdl_hm_iter_valid(iter)) {
+        SizedFont* sized = wdl_hm_iter_get_valuep(iter);
+        font->provider.terminate(sized->internal);
+        iter = wdl_hm_iter_next(iter);
+    }
+}
+
+void font_set_size(Font* font, u32 size) {
+    font->curr_size = size;
+    SizedFont sized = sized_font_create(font, size);
+    wdl_hm_insert(font->map, size, sized);
+}
+
+Glyph font_get_glyph(Font* font, u32 codepoint) {
+    SizedFont* sized = wdl_hm_getp(font->map, font->curr_size);
+    if (sized == NULL) {
+        wdl_error("Font of size %u hasn't been created.", font->curr_size);
+        return (Glyph) {0};
+    }
+
+    Glyph* _glyph = wdl_hm_getp(sized->glyph_map, codepoint);
+    if (_glyph != NULL) {
+        return *_glyph;
+    }
+
+    WDL_Scratch scratch = wdl_scratch_begin(&font->arena, 1);
+    FPGlyph fp_glyph = font->provider.get_glyph(sized->internal, scratch.arena, codepoint, sized->size);
+    QuadtreeAtlasNode* node = quadtree_atlas_insert(&sized->atlas_packer, fp_glyph.bitmap.size);
+    gfx_texture_subdata(sized->atlas_texture, (GfxTextureSubDataDesc) {
+            .size = fp_glyph.bitmap.size,
+            .format = GFX_TEXTURE_FORMAT_R_U8,
+            .alignment = 1,
+            .pos = node->pos,
+            .data = fp_glyph.bitmap.buffer,
+        });
+    wdl_scratch_end(scratch);
+
+    WDL_Vec2 uv_tl = wdl_v2_div(wdl_v2(node->pos.x, node->pos.y), wdl_v2(1024, 1024));
+    WDL_Vec2 uv_br = wdl_v2_div(wdl_v2(node->pos.x + fp_glyph.size.x, node->pos.y + fp_glyph.size.y), wdl_v2(1024, 1024));
+    Glyph glyph = {
+        .size = fp_glyph.size,
+        .uv = {uv_tl, uv_br},
+        .offset = fp_glyph.offset,
+        .advance = fp_glyph.advance,
+    };
+
+    wdl_hm_insert(sized->glyph_map, codepoint, glyph);
+
+    return glyph;
+}
+
+GfxTexture font_get_atlas(const Font* font) {
+    SizedFont* sized = wdl_hm_getp(font->map, font->curr_size);
+    if (sized == NULL) {
+        wdl_error("Font of size %u hasn't been created.", font->curr_size);
+        return GFX_TEXTURE_NULL;
+    }
+
+    return sized->atlas_texture;
+}
+
+FontMetrics font_get_metrics(const Font* font) {
+    SizedFont* sized = wdl_hm_getp(font->map, font->curr_size);
+    if (sized == NULL) {
+        wdl_error("Font of size %u hasn't been created.", font->curr_size);
+        return (FontMetrics) {0};
+    }
+
+    return sized->metrics;
 }
