@@ -405,89 +405,98 @@ void gfx_texture_bind(GfxTexture texture, u32 slot) {
     glBindTextureUnit(slot, internal->gl_handle);
 }
 
+static void _texture_format_to_gl_format(GfxTextureFormat format, u32* gl_internal_format, u32* gl_format, u32* gl_type) {
+    switch (format) {
+        case GFX_TEXTURE_FORMAT_R_U8:
+            *gl_internal_format = GL_R8;
+            *gl_format = GL_RED;
+            break;
+        case GFX_TEXTURE_FORMAT_RG_U8:
+            *gl_internal_format = GL_RG8;
+            *gl_format = GL_RG;
+            break;
+        case GFX_TEXTURE_FORMAT_RGB_U8:
+            *gl_internal_format = GL_RGB8;
+            *gl_format = GL_RGB;
+            break;
+        case GFX_TEXTURE_FORMAT_RGBA_U8:
+            *gl_internal_format = GL_RGBA8;
+            *gl_format = GL_RGBA;
+            break;
+
+        case GFX_TEXTURE_FORMAT_R_F16:
+            *gl_internal_format = GL_R16F;
+            *gl_format = GL_RED;
+            break;
+        case GFX_TEXTURE_FORMAT_RG_F16:
+            *gl_internal_format = GL_RG16F;
+            *gl_format = GL_RG;
+            break;
+        case GFX_TEXTURE_FORMAT_RGB_F16:
+            *gl_internal_format = GL_RGB16F;
+            *gl_format = GL_RGB;
+            break;
+        case GFX_TEXTURE_FORMAT_RGBA_F16:
+            *gl_internal_format = GL_RGBA16F;
+            *gl_format = GL_RGBA;
+            break;
+
+        case GFX_TEXTURE_FORMAT_R_F32:
+            *gl_internal_format = GL_R32F;
+            *gl_format = GL_RED;
+            break;
+        case GFX_TEXTURE_FORMAT_RG_F32:
+            *gl_internal_format = GL_RG32F;
+            *gl_format = GL_RG;
+            break;
+        case GFX_TEXTURE_FORMAT_RGB_F32:
+            *gl_internal_format = GL_RGB32F;
+            *gl_format = GL_RGB;
+            break;
+        case GFX_TEXTURE_FORMAT_RGBA_F32:
+            *gl_internal_format = GL_RGBA32F;
+            *gl_format = GL_RGBA;
+            break;
+    }
+
+    switch (format) {
+        case GFX_TEXTURE_FORMAT_R_U8:
+        case GFX_TEXTURE_FORMAT_RG_U8:
+        case GFX_TEXTURE_FORMAT_RGB_U8:
+        case GFX_TEXTURE_FORMAT_RGBA_U8:
+            *gl_type = GL_UNSIGNED_BYTE;
+            break;
+
+        case GFX_TEXTURE_FORMAT_R_F16:
+        case GFX_TEXTURE_FORMAT_RG_F16:
+        case GFX_TEXTURE_FORMAT_RGB_F16:
+        case GFX_TEXTURE_FORMAT_RGBA_F16:
+            *gl_type = GL_HALF_FLOAT;
+            break;
+
+        case GFX_TEXTURE_FORMAT_R_F32:
+        case GFX_TEXTURE_FORMAT_RG_F32:
+        case GFX_TEXTURE_FORMAT_RGB_F32:
+        case GFX_TEXTURE_FORMAT_RGBA_F32:
+            *gl_type = GL_FLOAT;
+            break;
+    }
+}
+
 void gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc) {
     InternalTexture* internal = resource_pool_get_data(texture.handle);
+    // Default to 4 since that's OpenGL's default.
+    if (desc.alignment == 0) {
+        desc.alignment = 4;
+    }
 
     internal->size = desc.size;
+    glPixelStorei(GL_UNPACK_ALIGNMENT, desc.alignment);
 
     u32 gl_internal_format;
     u32 gl_format;
-    switch (desc.format) {
-        case GFX_TEXTURE_FORMAT_R_U8:
-            gl_internal_format = GL_R8;
-            gl_format = GL_RED;
-            break;
-        case GFX_TEXTURE_FORMAT_RG_U8:
-            gl_internal_format = GL_RG8;
-            gl_format = GL_RG;
-            break;
-        case GFX_TEXTURE_FORMAT_RGB_U8:
-            gl_internal_format = GL_RGB8;
-            gl_format = GL_RGB;
-            break;
-        case GFX_TEXTURE_FORMAT_RGBA_U8:
-            gl_internal_format = GL_RGBA8;
-            gl_format = GL_RGBA;
-            break;
-
-        case GFX_TEXTURE_FORMAT_R_F16:
-            gl_internal_format = GL_R16F;
-            gl_format = GL_RED;
-            break;
-        case GFX_TEXTURE_FORMAT_RG_F16:
-            gl_internal_format = GL_RG16F;
-            gl_format = GL_RG;
-            break;
-        case GFX_TEXTURE_FORMAT_RGB_F16:
-            gl_internal_format = GL_RGB16F;
-            gl_format = GL_RGB;
-            break;
-        case GFX_TEXTURE_FORMAT_RGBA_F16:
-            gl_internal_format = GL_RGBA16F;
-            gl_format = GL_RGBA;
-            break;
-
-        case GFX_TEXTURE_FORMAT_R_F32:
-            gl_internal_format = GL_R32F;
-            gl_format = GL_RED;
-            break;
-        case GFX_TEXTURE_FORMAT_RG_F32:
-            gl_internal_format = GL_RG32F;
-            gl_format = GL_RG;
-            break;
-        case GFX_TEXTURE_FORMAT_RGB_F32:
-            gl_internal_format = GL_RGB32F;
-            gl_format = GL_RGB;
-            break;
-        case GFX_TEXTURE_FORMAT_RGBA_F32:
-            gl_internal_format = GL_RGBA32F;
-            gl_format = GL_RGBA;
-            break;
-    }
-
     u32 gl_type;
-    switch (desc.format) {
-        case GFX_TEXTURE_FORMAT_R_U8:
-        case GFX_TEXTURE_FORMAT_RG_U8:
-        case GFX_TEXTURE_FORMAT_RGB_U8:
-        case GFX_TEXTURE_FORMAT_RGBA_U8:
-            gl_type = GL_UNSIGNED_BYTE;
-            break;
-
-        case GFX_TEXTURE_FORMAT_R_F16:
-        case GFX_TEXTURE_FORMAT_RG_F16:
-        case GFX_TEXTURE_FORMAT_RGB_F16:
-        case GFX_TEXTURE_FORMAT_RGBA_F16:
-            gl_type = GL_HALF_FLOAT;
-            break;
-
-        case GFX_TEXTURE_FORMAT_R_F32:
-        case GFX_TEXTURE_FORMAT_RG_F32:
-        case GFX_TEXTURE_FORMAT_RGB_F32:
-        case GFX_TEXTURE_FORMAT_RGBA_F32:
-            gl_type = GL_FLOAT;
-            break;
-    }
+    _texture_format_to_gl_format(desc.format, &gl_internal_format, &gl_format, &gl_type);
 
     u32 gl_sampler;
     switch (desc.sampler) {
@@ -517,6 +526,22 @@ void gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc) {
             gl_type,
             desc.data);
 
+    glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void gfx_texture_subdata(GfxTexture texture, GfxTextureSubDataDesc desc) {
+    InternalTexture* internal = resource_pool_get_data(texture.handle);
+    // Default to 4 since that's OpenGL's default.
+    if (desc.alignment == 0) {
+        desc.alignment = 4;
+    }
+    glBindTexture(GL_TEXTURE_2D, internal->gl_handle);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, desc.alignment);
+    u32 gl_internal_format;
+    u32 gl_format;
+    u32 gl_type;
+    _texture_format_to_gl_format(desc.format, &gl_internal_format, &gl_format, &gl_type);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, desc.pos.x, desc.pos.y, desc.size.x, desc.size.y, gl_format, gl_type, desc.data);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
 

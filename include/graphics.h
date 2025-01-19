@@ -145,6 +145,16 @@ struct GfxTextureDesc {
     WDL_Ivec2 size;
     GfxTextureFormat format;
     GfxTextureSampler sampler;
+    u8 alignment;
+};
+
+typedef struct GfxTextureSubDataDesc GfxTextureSubDataDesc;
+struct GfxTextureSubDataDesc {
+    const void* data;
+    WDL_Ivec2 size;
+    WDL_Ivec2 pos;
+    GfxTextureFormat format;
+    u8 alignment;
 };
 
 #define GFX_TEXTURE_NULL ((GfxTexture) { NULL })
@@ -152,6 +162,7 @@ struct GfxTextureDesc {
 extern GfxTexture gfx_texture_new(GfxTextureDesc desc);
 extern void       gfx_texture_bind(GfxTexture texture, u32 slot);
 extern void       gfx_texture_resize(GfxTexture texture, GfxTextureDesc desc);
+extern void       gfx_texture_subdata(GfxTexture texture, GfxTextureSubDataDesc desc);
 extern WDL_Ivec2  gfx_texture_get_size(GfxTexture texture);
 extern b8         gfx_texture_is_null(GfxTexture texture);
 

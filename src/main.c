@@ -367,20 +367,18 @@ i32 main(void) {
         if (chars[c] != 0 && c_timer >= 0.0f) {
             FT_Load_Char(face, chars[c], FT_LOAD_DEFAULT);
             FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
-            FT_Bitmap bm_size = face->glyph->bitmap;
-            WDL_Ivec2 size = wdl_iv2(bm_size.width, bm_size.rows);
+            FT_Bitmap bm = face->glyph->bitmap;
+            WDL_Ivec2 size = wdl_iv2(bm.width, bm.rows);
             QuadtreeAtlasNode* node = quadtree_atlas_insert(&atlas, size);
 
-            for (u32 y = 0; y < bm_size.rows; y++) {
-                u8* atlas_bm = &atlas.bitmap[node->pos.x + (node->pos.y + y) * atlas.root.size.x];
-                memcpy(atlas_bm, &bm_size.buffer[y * bm_size.width], bm_size.width);
-            }
-            gfx_texture_resize(atlas_texture, (GfxTextureDesc) {
-                    .data = atlas.bitmap,
-                    .size = atlas.root.size,
+            gfx_texture_subdata(atlas_texture, (GfxTextureSubDataDesc) {
+                    .data = bm.buffer,
+                    .size = wdl_iv2(bm.width, bm.rows),
                     .format = GFX_TEXTURE_FORMAT_R_U8,
-                    .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
+                    .pos = node->pos,
+                    .alignment = 1,
                 });
+
             c_timer = 0.0f;
             c++;
         }
