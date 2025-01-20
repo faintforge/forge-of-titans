@@ -380,6 +380,7 @@ i32 main(void) {
             .screen_size = screen_size,
             .zoom = screen_size.y,
             .pos = wdl_v2(screen_size.x / 2.0f, -screen_size.y / 2.0f),
+            .invert_y = true,
         };
         batch_begin(br, text_shader);
 
@@ -388,16 +389,13 @@ i32 main(void) {
         font_set_size(font, 32);
         WDL_Str str = wdl_str_lit("Forge of Titans");
         FontMetrics metrics = font_get_metrics(font);
-        WDL_Vec2 pos = wdl_v2(32.0f, -32.0f - metrics.ascent);
+        WDL_Vec2 pos = wdl_v2(32.0f, 32.0f + metrics.ascent);
         for (u32 i = 0; i < str.len; i++) {
             Glyph glyph = font_get_glyph(font, str.data[i]);
-            WDL_Vec2 gpos = pos;
-            gpos.x += glyph.offset.x;
-            gpos.y -= glyph.offset.y;
             draw_quad_atlas(br, (Quad) {
-                    .pos = gpos,
+                    .pos = wdl_v2_add(pos, glyph.offset),
                     .size = glyph.size,
-                    .pivot = wdl_v2(-0.5f, 0.5f),
+                    .pivot = wdl_v2(-0.5f, -0.5f),
                     .color = GFX_COLOR_WHITE,
                     .texture = font_get_atlas(font),
                 }, glyph.uv, ui_cam);

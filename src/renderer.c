@@ -244,6 +244,11 @@ void draw_quad_atlas(BatchRenderer* br, Quad quad, WDL_Vec2 uvs[2], Camera cam) 
         wdl_v2(se.x, nw.y),
     };
 
+    if (cam.invert_y) {
+        quad.pos.y = -quad.pos.y;
+        quad.pivot.y = -quad.pivot.y;
+    }
+
     // TODO: Cache the projection matrix in the camera.
     WDL_Mat4 proj = camera_proj(cam);
     WDL_Mat4 view = camera_view(cam);

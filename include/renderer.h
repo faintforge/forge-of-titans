@@ -54,6 +54,7 @@ struct Camera {
     WDL_Ivec2 screen_size;
     WDL_Vec2 pos;
     f32 zoom;
+    b8 invert_y;
 };
 
 extern WDL_Mat4 camera_proj(Camera cam);
