@@ -323,7 +323,6 @@ static u32 fp_stbtt_get_glyph_index(void* internal, u32 codepoint) {
     return glyph_index;
 }
 
-// TODO: Explore left side bearing.
 static FPGlyph fp_stbtt_get_glyph(void* internal, WDL_Arena* arena, u32 glyph_index, u32 size) {
     STBTTInternal* stbtt = internal;
     i32 advance;
@@ -394,7 +393,6 @@ struct GlyphInternal {
 
 typedef struct SizedFont SizedFont;
 struct SizedFont {
-    void* internal;
     u32 size;
     QuadtreeAtlas atlas_packer;
     GfxTexture atlas_texture;
@@ -409,18 +407,17 @@ struct Font {
     FontProvider provider;
     WDL_Str ttf_data;
 
+    void* internal;
     u32 curr_size;
     WDL_HashMap* map;
 };
 
 SizedFont sized_font_create(Font* font, u32 size) {
-    void* internal = font->provider.init(font->arena, font->ttf_data);
     WDL_Ivec2 atlas_size = wdl_iv2(256, 256);
     // Provide a buffer with zeros so the texture is properly cleared.
     WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
     u8* zero_buffer = wdl_arena_push(scratch.arena, atlas_size.x * atlas_size.y);
     SizedFont sized = {
-        .internal = internal,
         .size = size,
         .atlas_packer = quadtree_atlas_init(font->arena, atlas_size),
         .atlas_texture = gfx_texture_new((GfxTextureDesc) {
@@ -429,7 +426,7 @@ SizedFont sized_font_create(Font* font, u32 size) {
                 .format = GFX_TEXTURE_FORMAT_R_U8,
                 .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
             }),
-        .metrics = font->provider.get_metrics(internal, size),
+        .metrics = font->provider.get_metrics(font->internal, size),
         .glyph_map = wdl_hm_new(wdl_hm_desc_generic(font->arena, 32, u32, GlyphInternal)),
     };
     wdl_scratch_end(scratch);
@@ -438,29 +435,31 @@ SizedFont sized_font_create(Font* font, u32 size) {
 
 Font* font_create(WDL_Arena* arena, WDL_Str filename) {
     Font* font = wdl_arena_push_no_zero(arena, sizeof(Font));
+    WDL_Str ttf_data = read_file(arena, filename);
+    // Push a zero onto the arena so the 'ttf_data' string works as a cstr as
+    // well.
+    wdl_arena_push(arena, 1);
+    FontProvider provider = FT2_PROVIDER;
     *font = (Font) {
         .arena = arena,
-        .provider = FT2_PROVIDER,
-        // .provider = STBTT_PROVIDER,
-        .ttf_data = read_file(arena, filename),
+        .provider = provider,
+        .internal = provider.init(arena, ttf_data),
+        .ttf_data = ttf_data,
         .map = wdl_hm_new(wdl_hm_desc_generic(arena, 32, u32, SizedFont)),
     };
     return font;
 }
 
 void font_destroy(Font* font) {
-    WDL_HashMapIter iter = wdl_hm_iter_new(font->map);
-    while (wdl_hm_iter_valid(iter)) {
-        SizedFont* sized = wdl_hm_iter_get_valuep(iter);
-        font->provider.terminate(sized->internal);
-        iter = wdl_hm_iter_next(iter);
-    }
+    font->provider.terminate(font->internal);
 }
 
 void font_set_size(Font* font, u32 size) {
     font->curr_size = size;
-    SizedFont sized = sized_font_create(font, size);
-    wdl_hm_insert(font->map, size, sized);
+    if (!wdl_hm_has(font->map, size)) {
+        SizedFont sized = sized_font_create(font, size);
+        wdl_hm_insert(font->map, size, sized);
+    }
 }
 
 static void expand_atlas(Font* font, SizedFont* sized) {
@@ -507,14 +506,14 @@ Glyph font_get_glyph(Font* font, u32 codepoint) {
         return (Glyph) {0};
     }
 
-    u32 glyph_index = font->provider.get_glyph_index(sized->internal, codepoint);
+    u32 glyph_index = font->provider.get_glyph_index(font->internal, codepoint);
     Glyph* _glyph = wdl_hm_getp(sized->glyph_map, glyph_index);
     if (_glyph != NULL) {
         return *_glyph;
     }
 
     WDL_Scratch scratch = wdl_scratch_begin(&font->arena, 1);
-    FPGlyph fp_glyph = font->provider.get_glyph(sized->internal, scratch.arena, glyph_index, sized->size);
+    FPGlyph fp_glyph = font->provider.get_glyph(font->internal, scratch.arena, glyph_index, sized->size);
     u32 bitmap_size = fp_glyph.bitmap.size.x * fp_glyph.bitmap.size.y;
     u8* bitmap = wdl_arena_push(font->arena, bitmap_size);
     memcpy(bitmap, fp_glyph.bitmap.buffer, bitmap_size);
@@ -574,15 +573,9 @@ FontMetrics font_get_metrics(const Font* font) {
 }
 
 f32 font_get_kerning(const Font* font, u32 left_codepoint, u32 right_codepoint) {
-    SizedFont* sized = wdl_hm_getp(font->map, font->curr_size);
-    if (sized == NULL) {
-        wdl_error("Font of size %u hasn't been created.", font->curr_size);
-        return 0.0f;
-    }
-
-    u32 left_glyph = font->provider.get_glyph_index(sized->internal, left_codepoint);
-    u32 right_glyph = font->provider.get_glyph_index(sized->internal, right_codepoint);
-    return font->provider.get_kerning(sized->internal, left_glyph, right_glyph, font->curr_size);
+    u32 left_glyph = font->provider.get_glyph_index(font->internal, left_codepoint);
+    u32 right_glyph = font->provider.get_glyph_index(font->internal, right_codepoint);
+    return font->provider.get_kerning(font->internal, left_glyph, right_glyph, font->curr_size);
 }
 
 void debug_font_atlas(const Font* font, Quad quad, Camera cam) {

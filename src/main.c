@@ -185,7 +185,7 @@ i32 main(void) {
         wdl_info("Window created successfully!");
     }
     window_make_current(window);
-    prof_end();
+    prof_end(); // Window create
 
     prof_begin(wdl_str_lit("Graphics init"));
     if (!gfx_init()) {
@@ -194,7 +194,7 @@ i32 main(void) {
     } else {
         wdl_info("Graphics system initialized successfully!");
     }
-    prof_end();
+    prof_end(); // Graphics init
 
     // -------------------------------------------------------------------------
 
@@ -293,9 +293,9 @@ i32 main(void) {
 
     // -------------------------------------------------------------------------
 
-    Font* font = font_create(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"));
+    // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"));
     // Font* font = font_create(arena, wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"));
-    // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"));
+    Font* font = font_create(arena, wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"));
     // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"));
     font_set_size(font, 64);
 
@@ -350,6 +350,7 @@ i32 main(void) {
         //     }, ui_cam);
 
         {
+            font_set_size(font, 32);
             WDL_Vec2 size = wdl_v2s(camera.zoom);
             WDL_Vec2 pos = wdl_v2_divs(wdl_v2s(camera.zoom), 2.0f);
             pos.x = -pos.x;
@@ -371,16 +372,22 @@ i32 main(void) {
         WDL_Str str = wdl_str_lit("The quick brown fox jumps over the lazy dog.");
         // WDL_Str str = wdl_str_lit("Forge of Titans");
         str_pos_timer += dt;
+        str_pos = str.len;
         if (str_pos < str.len && str_pos_timer >= 0.1f) {
             str_pos++;
             str_pos_timer = 0.0f;
         }
 
-        // WDL_Str str = wdl_str_lit("Forge of Titans");
         WDL_Vec2 pos = wdl_v2s(16.0f);
         pos.y += metrics.ascent;
         pos.y = -pos.y;
         for (u32 i = 0; i < str_pos; i++) {
+            if (i % 2) {
+                font_set_size(font, 32);
+            } else {
+                font_set_size(font, 64);
+            }
+
             u8 codepoint = str.data[i];
             Glyph glyph = font_get_glyph(font, codepoint);
             // WDL_Vec2 gpos = wdl_v2_add(pos, glyph.offset);
@@ -452,12 +459,12 @@ i32 main(void) {
         debug_ctx_reset(&dbg);
         batch_end(br);
 
-        prof_end();
+        prof_end(); // Rendering
 
         window_swap_buffers(window);
         window_poll_events();
 
-        prof_end();
+        prof_end(); // Main loop
 
         profiler_end_frame();
         frame++;
