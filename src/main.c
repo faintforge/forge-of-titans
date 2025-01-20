@@ -149,6 +149,18 @@ static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void
         }
     }
 
+    GfxTexture player;
+    asset_get(wdl_str_lit("player"), ASSET_TYPE_TEXTURE, &player);
+    WDL_Ivec2 size = gfx_texture_get_size(player);
+    f32 aspect = (f32) size.x / (f32) size.y;
+    draw_quad(br, (Quad) {
+            .pos = wdl_v2s(0.0f),
+            .size = wdl_v2_muls(wdl_v2(aspect, 1.0f), 5.0f),
+            .rotation = 0.0f,
+            .color = GFX_COLOR_WHITE,
+            .texture = player,
+        }, camera);
+
     batch_end(br);
     prof_end();
 }
@@ -291,12 +303,40 @@ i32 main(void) {
     render_pipeline_add_pass(&state.pipeline, blit_pass);
 
     prof_begin(wdl_str_lit("Asset loading"));
-    asset_load(wdl_str_lit("roboto"), wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"), ASSET_TYPE_FONT);
-    asset_load(wdl_str_lit("soulside"), wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"), ASSET_TYPE_FONT);
-    asset_load(wdl_str_lit("spline_sans"), wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"), ASSET_TYPE_FONT);
-    asset_load(wdl_str_lit("tiny5"), wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"), ASSET_TYPE_FONT);
-    prof_end(); // Asset loading
+    {
+        prof_begin(wdl_str_lit("Fonts"));
+        asset_load((AssetDesc) {
+                .name = wdl_str_lit("roboto"),
+                .filepath = wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"),
+                .type = ASSET_TYPE_FONT,
+            });
+        asset_load((AssetDesc) {
+                .name = wdl_str_lit("soulside"),
+                .filepath = wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"),
+                .type = ASSET_TYPE_FONT,
+            });
+        asset_load((AssetDesc) {
+                .name = wdl_str_lit("spline_sans"),
+                .filepath = wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"),
+                .type = ASSET_TYPE_FONT,
+            });
+        asset_load((AssetDesc) {
+                .name = wdl_str_lit("tiny5"),
+                .filepath = wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"),
+                .type = ASSET_TYPE_FONT,
+            });
+        prof_end(); // Fonts
 
+        prof_begin(wdl_str_lit("Textures"));
+        asset_load((AssetDesc) {
+                .name = wdl_str_lit("player"),
+                .filepath = wdl_str_lit("assets/textures/player.png"),
+                .type = ASSET_TYPE_TEXTURE,
+                .texture_sampler = GFX_TEXTURE_SAMPLER_NEAREST,
+            });
+        prof_end(); // Textures
+    }
+    prof_end(); // Asset loading
     prof_end(); // Startup
 
     profiler_dump_frame();
@@ -343,7 +383,8 @@ i32 main(void) {
         };
         batch_begin(br, text_shader);
 
-        Font* font = asset_get(wdl_str_lit("tiny5"), ASSET_TYPE_FONT);
+        Font* font = NULL;
+        asset_get(wdl_str_lit("tiny5"), ASSET_TYPE_FONT, &font);
         font_set_size(font, 32);
         WDL_Str str = wdl_str_lit("Forge of Titans");
         FontMetrics metrics = font_get_metrics(font);

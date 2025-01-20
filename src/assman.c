@@ -1,6 +1,11 @@
 #include "assman.h"
+#include "graphics.h"
 #include "waddle.h"
 #include "font.h"
+
+#include <string.h>
+
+#include <stb_image.h>
 
 static const char* asset_type_to_cstr(AssetType type) {
     switch (type) {
@@ -15,7 +20,8 @@ static const char* asset_type_to_cstr(AssetType type) {
 
 typedef struct AssetLoader AssetLoader;
 struct AssetLoader {
-    void* (*load)(WDL_Str filepath);
+    u64 asset_size;
+    void* (*load)(AssetDesc desc);
     void (*unload)(void* data);
 };
 
@@ -37,13 +43,32 @@ struct AssetManager {
 
 static AssetManager assman = {0};
 
-static void* load_texture(WDL_Str filepath) {
-    (void) filepath;
-    return NULL;
+static void* load_texture(AssetDesc desc) {
+    WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
+    const char* cstr = wdl_str_to_cstr(scratch.arena, desc.filepath);
+    WDL_Ivec2 size;
+    i32 channels;
+    u8* data = stbi_load(cstr, &size.x, &size.y, &channels, 0);
+    if (data == NULL) {
+        wdl_error("Texture %.*s not found!", desc.filepath.len, desc.filepath.data);
+        return NULL;
+    }
+    GfxTexture* texture = wdl_arena_push_no_zero(assman.arena, sizeof(GfxTexture));
+    *texture = gfx_texture_new((GfxTextureDesc) {
+            .data = data,
+            .format = channels,
+            .size = size,
+            .sampler = desc.texture_sampler,
+        });
+    stbi_image_free(data);
+    wdl_scratch_end(scratch);
+    return texture;
 }
 
-static void* font_load(WDL_Str filepath) {
-    return font_create(assman.arena, filepath);
+static void* font_load(AssetDesc desc) {
+    Font** font = wdl_arena_push_no_zero(assman.arena, sizeof(Font*));
+    *font = font_create(assman.arena, desc.filepath);
+    return font;
 }
 
 void assman_init(void) {
@@ -55,9 +80,11 @@ void assman_init(void) {
         .arena = arena,
         .loaders = {
             [ASSET_TYPE_TEXTURE] = {
+                .asset_size = sizeof(GfxTexture),
                 .load = load_texture,
             },
             [ASSET_TYPE_FONT] = {
+                .asset_size = sizeof(Font*),
                 .load = font_load,
                 .unload = (void (*)(void*)) font_destroy,
             },
@@ -77,34 +104,34 @@ void assman_terminate(void) {
     }
 }
 
-void asset_load(WDL_Str name, WDL_Str filepath, AssetType type) {
+void asset_load(AssetDesc desc) {
     wdl_assert(assman.inited, "Asset manager not initialized.");
-    wdl_assert(type < ASSET_TYPE_COUNT, "Unknown asset type.");
+    wdl_assert(desc.type < ASSET_TYPE_COUNT, "Unknown asset type.");
 
     Asset asset = {
-        .type = type,
-        .data = assman.loaders[type].load(filepath),
+        .type = desc.type,
+        .data = assman.loaders[desc.type].load(desc),
     };
-    b8 new = wdl_hm_insert(assman.asset_map, name, asset);
+    b8 new = wdl_hm_insert(assman.asset_map, desc.name, asset);
     if (!new) {
-        wdl_warn("Asset %.*s (%s) already loaded!", name.len, name.data, asset_type_to_cstr(type));
+        wdl_warn("Asset %.*s (%s) already loaded!", desc.name.len, desc.name.data, asset_type_to_cstr(desc.type));
     }
 }
 
-void* asset_get(WDL_Str name, AssetType type) {
+void asset_get(WDL_Str name, AssetType type, void* output) {
     wdl_assert(assman.inited, "Asset manager not initialized.");
     wdl_assert(type < ASSET_TYPE_COUNT, "Unknown asset type.");
 
     Asset* asset = wdl_hm_getp(assman.asset_map, name);
     if (asset == NULL) {
         wdl_warn("Asset %.*s (%s) not found!", name.len, name.data, asset_type_to_cstr(type));
-        return NULL;
+        return;
     }
 
     if (asset->type != type) {
         wdl_warn("Asset %.*s (%s) requested as a %s!", name.len, name.data, asset_type_to_cstr(asset->type), asset_type_to_cstr(type));
-        return NULL;
+        return;
     }
 
-    return asset->data;
+    memcpy(output, asset->data, assman.loaders[type].asset_size);
 }
