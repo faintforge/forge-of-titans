@@ -293,11 +293,11 @@ i32 main(void) {
 
     // -------------------------------------------------------------------------
 
-    Font* font = font_create(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"));
-    // Font* font = font_create(arena, wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"));
+    // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"));
+    Font* font = font_create(arena, wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"));
     // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"));
     // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"));
-    font_set_size(font, 32);
+    font_set_size(font, 128);
 
     WDL_Arena* frame_arena = wdl_arena_create();
     DebugCtx dbg = {
@@ -349,18 +349,26 @@ i32 main(void) {
         //         .pivot = wdl_v2(-0.5f, 0.5f),
         //     }, ui_cam);
 
-        debug_font_atlas(font, (Quad) {
-                .pos = wdl_v2(0, -256),
-                .size = wdl_v2s(256),
-                .texture = font_get_atlas(font),
-                .color = GFX_COLOR_WHITE,
-            }, ui_cam);
+        // WDL_Ivec2 atlas_size = gfx_texture_get_size(font_get_atlas(font));
+        {
+            WDL_Vec2 size = wdl_v2s(camera.zoom);
+            WDL_Vec2 pos = wdl_v2_divs(wdl_v2s(camera.zoom), 2.0f);
+            pos.x = -pos.x;
+            debug_font_atlas(font, (Quad) {
+                    // .pos = wdl_v2(0, -256),
+                    // .size = wdl_v2(atlas_size.x, atlas_size.y),
+                    .pos = pos,
+                    .size = size,
+                    .texture = font_get_atlas(font),
+                    .color = GFX_COLOR_WHITE,
+                    }, camera);
+        }
 
         batch_begin(br, text_shader);
 
-        // WDL_Str str = wdl_str_lit("!\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+        WDL_Str str = wdl_str_lit("!\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
         // WDL_Str str = wdl_str_lit("The quick brown fox jumps over the lazy dog.");
-        WDL_Str str = wdl_str_lit("Forge of Titans");
+        // WDL_Str str = wdl_str_lit("Forge of Titans");
         str_pos_timer += dt;
         if (str_pos < str.len && str_pos_timer >= 0.1f) {
             str_pos++;
@@ -370,12 +378,20 @@ i32 main(void) {
         Glyph no = font_get_glyph(font, 78923);
         Glyph no2 = font_get_glyph(font, 78924);
         draw_quad_atlas(br, (Quad) {
-                .pos = wdl_v2(256, 256),
+                .pos = wdl_v2(256, -256),
                 .size = no.size,
                 .texture = font_get_atlas(font),
                 .color = GFX_COLOR_WHITE,
                 .pivot = wdl_v2(-0.5f, 0.5f),
             }, no.uv, ui_cam);
+
+        draw_quad_atlas(br, (Quad) {
+                .pos = wdl_v2(256 + no.advance, -256),
+                .size = no2.size,
+                .texture = font_get_atlas(font),
+                .color = GFX_COLOR_WHITE,
+                .pivot = wdl_v2(-0.5f, 0.5f),
+            }, no2.uv, ui_cam);
 
         FontMetrics metrics = font_get_metrics(font);
         // WDL_Str str = wdl_str_lit("Forge of Titans");

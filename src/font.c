@@ -1,5 +1,4 @@
 #include "font.h"
-#include "freetype/config/ftstdlib.h"
 #include "graphics.h"
 #include "renderer.h"
 #include "waddle.h"
@@ -289,6 +288,13 @@ FontProvider font_provider_get_ft2(void) {
 
 // -- Forward facing API -------------------------------------------------------
 
+typedef struct GlyphInternal GlyphInternal;
+struct GlyphInternal {
+    Glyph user_glyph;
+    u8* bitmap;
+    WDL_Ivec2 bitmap_size;
+};
+
 typedef struct SizedFont SizedFont;
 struct SizedFont {
     void* internal;
@@ -297,7 +303,7 @@ struct SizedFont {
     GfxTexture atlas_texture;
     FontMetrics metrics;
     // Key: u32 (glyph index)
-    // Value: Glyph
+    // Value: GlyphInternal
     WDL_HashMap* glyph_map;
 };
 
@@ -327,7 +333,7 @@ SizedFont sized_font_create(Font* font, u32 size) {
                 .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
             }),
         .metrics = font->provider.get_metrics(internal, size),
-        .glyph_map = wdl_hm_new(wdl_hm_desc_generic(font->arena, 32, u32, Glyph)),
+        .glyph_map = wdl_hm_new(wdl_hm_desc_generic(font->arena, 32, u32, GlyphInternal)),
     };
     wdl_scratch_end(scratch);
     return sized;
@@ -359,6 +365,50 @@ void font_set_size(Font* font, u32 size) {
     wdl_hm_insert(font->map, size, sized);
 }
 
+static void expand_atlas(Font* font, SizedFont* sized) {
+    QuadtreeAtlas packer = quadtree_atlas_init(font->arena, wdl_iv2_muls(sized->atlas_packer.size, 2));
+    wdl_debug("Out of space, need to resize!");
+
+    WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
+    u8* bitmap = wdl_arena_push(scratch.arena, packer.size.x * packer.size.y);
+
+    WDL_HashMapIter iter = wdl_hm_iter_new(sized->glyph_map);
+    while (wdl_hm_iter_valid(iter)) {
+        GlyphInternal* glyph = wdl_hm_iter_get_valuep(iter);
+        QuadtreeAtlasNode* node = quadtree_atlas_insert(&packer, glyph->bitmap_size);
+        for (i32 y = 0; y < glyph->bitmap_size.y; y++) {
+            u32 atlas_index = node->pos.x + (node->pos.y + y) * packer.size.x;
+            u32 glyph_index = y * glyph->bitmap_size.x;
+            memcpy(&bitmap[atlas_index], &glyph->bitmap[glyph_index], glyph->bitmap_size.x);
+        }
+        // gfx_texture_subdata(sized->atlas_texture, (GfxTextureSubDataDesc) {
+        //         .size = glyph->bitmap_size,
+        //         .format = GFX_TEXTURE_FORMAT_R_U8,
+        //         .alignment = 1,
+        //         .pos = node->pos,
+        //         .data = glyph->bitmap,
+        //     });
+
+        WDL_Vec2 atlas_size = wdl_v2(packer.size.x, packer.size.y);
+        WDL_Vec2 uv_tl = wdl_v2_div(wdl_v2(node->pos.x, node->pos.y), atlas_size);
+        WDL_Vec2 uv_br = wdl_v2_div(wdl_v2(node->pos.x + glyph->bitmap_size.x, node->pos.y + glyph->bitmap_size.y), atlas_size);
+        glyph->user_glyph.uv[0] = uv_tl;
+        glyph->user_glyph.uv[1] = uv_br;
+
+        iter = wdl_hm_iter_next(iter);
+    }
+
+    gfx_texture_resize(sized->atlas_texture, (GfxTextureDesc) {
+            .data = bitmap,
+            .size = packer.size,
+            .format = GFX_TEXTURE_FORMAT_R_U8,
+            .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
+        });
+    wdl_scratch_end(scratch);
+
+    sized->atlas_packer = packer;
+}
+
 Glyph font_get_glyph(Font* font, u32 codepoint) {
     SizedFont* sized = wdl_hm_getp(font->map, font->curr_size);
     if (sized == NULL) {
@@ -374,30 +424,42 @@ Glyph font_get_glyph(Font* font, u32 codepoint) {
 
     WDL_Scratch scratch = wdl_scratch_begin(&font->arena, 1);
     FPGlyph fp_glyph = font->provider.get_glyph(sized->internal, scratch.arena, glyph_index, sized->size);
+    u32 bitmap_size = fp_glyph.bitmap.size.x * fp_glyph.bitmap.size.y;
+    u8* bitmap = wdl_arena_push(font->arena, bitmap_size);
+    memcpy(bitmap, fp_glyph.bitmap.buffer, bitmap_size);
+    wdl_scratch_end(scratch);
 
     QuadtreeAtlasNode* node = quadtree_atlas_insert(&sized->atlas_packer, fp_glyph.bitmap.size);
+    // Atlas out of space.
+    if (node == NULL) {
+        expand_atlas(font, sized);
+        return (Glyph) {0};
+    }
     gfx_texture_subdata(sized->atlas_texture, (GfxTextureSubDataDesc) {
             .size = fp_glyph.bitmap.size,
             .format = GFX_TEXTURE_FORMAT_R_U8,
             .alignment = 1,
             .pos = node->pos,
-            .data = fp_glyph.bitmap.buffer,
+            .data = bitmap,
         });
-    wdl_scratch_end(scratch);
 
     WDL_Vec2 atlas_size = wdl_v2(sized->atlas_packer.size.x, sized->atlas_packer.size.y);
     WDL_Vec2 uv_tl = wdl_v2_div(wdl_v2(node->pos.x, node->pos.y), atlas_size);
     WDL_Vec2 uv_br = wdl_v2_div(wdl_v2(node->pos.x + fp_glyph.size.x, node->pos.y + fp_glyph.size.y), atlas_size);
-    Glyph glyph = {
-        .size = fp_glyph.size,
-        .uv = {uv_tl, uv_br},
-        .offset = fp_glyph.offset,
-        .advance = fp_glyph.advance,
+    GlyphInternal glyph = {
+        .user_glyph = {
+            .size = fp_glyph.size,
+            .uv = {uv_tl, uv_br},
+            .offset = fp_glyph.offset,
+            .advance = fp_glyph.advance,
+        },
+        .bitmap_size = fp_glyph.bitmap.size,
+        .bitmap = bitmap,
     };
 
     wdl_hm_insert(sized->glyph_map, glyph_index, glyph);
 
-    return glyph;
+    return glyph.user_glyph;
 }
 
 GfxTexture font_get_atlas(const Font* font) {
