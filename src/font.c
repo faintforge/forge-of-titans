@@ -257,7 +257,7 @@ static FPGlyph ft2_get_glyph(void* internal, WDL_Arena* arena, u32 glyph_index, 
             .buffer = bm.buffer,
         },
         .size = wdl_v2(metrics.width >> 6, metrics.height >> 6),
-        .offset = wdl_v2(metrics.horiBearingX >> 6, metrics.horiBearingY >> 6),
+        .offset = wdl_v2(metrics.horiBearingX >> 6, -metrics.horiBearingY >> 6),
         .advance = metrics.horiAdvance >> 6,
     };
 
@@ -295,9 +295,93 @@ static const FontProvider FT2_PROVIDER = {
     .get_kerning = ft2_get_kerning,
 };
 
-FontProvider font_provider_get_ft2(void) {
-    return FT2_PROVIDER;
+// -- stb_truetype font provider -----------------------------------------------
+
+typedef struct STBTTInternal STBTTInternal;
+struct STBTTInternal {
+    stbtt_fontinfo info;
+};
+
+static void* fp_stbtt_init(WDL_Arena* arena, WDL_Str ttf_data) {
+    STBTTInternal* internal = wdl_arena_push_no_zero(arena, sizeof(STBTTInternal));
+
+    const u8* ttf_cstr = (const u8*) wdl_str_to_cstr(arena, ttf_data);
+    if (!stbtt_InitFont(&internal->info, ttf_cstr, stbtt_GetFontOffsetForIndex(ttf_cstr, 0))) {
+        wdl_error("STBTT: Init error!");
+    }
+
+    return internal;
 }
+
+static void fp_stbtt_terminate(void* internal) {
+    (void) internal;
+}
+
+static u32 fp_stbtt_get_glyph_index(void* internal, u32 codepoint) {
+    STBTTInternal* stbtt = internal;
+    u32 glyph_index = stbtt_FindGlyphIndex(&stbtt->info, codepoint);
+    return glyph_index;
+}
+
+// TODO: Explore left side bearing.
+static FPGlyph fp_stbtt_get_glyph(void* internal, WDL_Arena* arena, u32 glyph_index, u32 size) {
+    STBTTInternal* stbtt = internal;
+    i32 advance;
+    i32 lsb;
+    stbtt_GetGlyphHMetrics(&stbtt->info, glyph_index, &advance, &lsb);
+
+    f32 scale = stbtt_ScaleForPixelHeight(&stbtt->info, size);
+    WDL_Ivec2 i0;
+    WDL_Ivec2 i1;
+    stbtt_GetGlyphBitmapBox(&stbtt->info, glyph_index, scale, scale, &i0.x, &i0.y, &i1.x, &i1.y);
+    WDL_Ivec2 bitmap_size = wdl_iv2_sub(i1, i0);
+    WDL_Vec2 glyph_size = wdl_v2(bitmap_size.x, bitmap_size.y);
+    u32 bitmap_area = bitmap_size.x * bitmap_size.y;
+    u8* bitmap = wdl_arena_push_no_zero(arena, bitmap_area);
+    stbtt_MakeGlyphBitmap(&stbtt->info, bitmap, bitmap_size.x, bitmap_size.y, bitmap_size.x, scale, scale, glyph_index);
+
+    FPGlyph glyph = {
+        .advance = floorf(advance * scale),
+        .bitmap = {
+            .size = bitmap_size,
+            .buffer = bitmap,
+        },
+        .size = glyph_size,
+        // .offset = wdl_v2(i0.x + floorf(lsb * scale), i0.y),
+        .offset = wdl_v2(i0.x, i0.y),
+    };
+    return glyph;
+}
+
+static FontMetrics fp_stbtt_get_metrics(void* internal, u32 size) {
+    STBTTInternal* stbtt = internal;
+    f32 scale = stbtt_ScaleForPixelHeight(&stbtt->info, size);
+    i32 ascent;
+    i32 descent;
+    i32 linegap;
+    stbtt_GetFontVMetrics(&stbtt->info, &ascent, &descent, &linegap);
+    return (FontMetrics) {
+        .ascent = floorf(ascent * scale),
+        .descent = floorf(descent * scale),
+        .linegap = floorf(linegap * scale),
+    };
+}
+
+static i32 fp_stbtt_get_kerning(void* internal, u32 left_glyph, u32 right_glyph, u32 size) {
+    STBTTInternal* stbtt = internal;
+    f32 scale = stbtt_ScaleForPixelHeight(&stbtt->info, size);
+    f32 kern = stbtt_GetGlyphKernAdvance(&stbtt->info, left_glyph, right_glyph);
+    return floorf(kern * scale);
+}
+
+static const FontProvider STBTT_PROVIDER = {
+    .init = fp_stbtt_init,
+    .terminate = fp_stbtt_terminate,
+    .get_glyph_index = fp_stbtt_get_glyph_index,
+    .get_glyph = fp_stbtt_get_glyph,
+    .get_metrics = fp_stbtt_get_metrics,
+    .get_kerning = fp_stbtt_get_kerning,
+};
 
 // -- Forward facing API -------------------------------------------------------
 
@@ -357,6 +441,7 @@ Font* font_create(WDL_Arena* arena, WDL_Str filename) {
     *font = (Font) {
         .arena = arena,
         .provider = FT2_PROVIDER,
+        // .provider = STBTT_PROVIDER,
         .ttf_data = read_file(arena, filename),
         .map = wdl_hm_new(wdl_hm_desc_generic(arena, 32, u32, SizedFont)),
     };
@@ -394,13 +479,6 @@ static void expand_atlas(Font* font, SizedFont* sized) {
             u32 glyph_index = y * glyph->bitmap_size.x;
             memcpy(&bitmap[atlas_index], &glyph->bitmap[glyph_index], glyph->bitmap_size.x);
         }
-        // gfx_texture_subdata(sized->atlas_texture, (GfxTextureSubDataDesc) {
-        //         .size = glyph->bitmap_size,
-        //         .format = GFX_TEXTURE_FORMAT_R_U8,
-        //         .alignment = 1,
-        //         .pos = node->pos,
-        //         .data = glyph->bitmap,
-        //     });
 
         WDL_Vec2 atlas_size = wdl_v2(packer.size.x, packer.size.y);
         WDL_Vec2 uv_tl = wdl_v2_div(wdl_v2(node->pos.x, node->pos.y), atlas_size);

@@ -115,6 +115,10 @@ b8 gfx_init(void) {
         return false;
     }
 
+    // TODO: Let the user control blending at some stage of the rendering process.
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);  
+
     return true;
 }
 
