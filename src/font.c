@@ -1,4 +1,5 @@
 #include "font.h"
+#include "freetype/config/ftstdlib.h"
 #include "graphics.h"
 #include "renderer.h"
 #include "waddle.h"
@@ -190,7 +191,8 @@ typedef struct FontProvider FontProvider;
 struct FontProvider {
     void* (*init)(WDL_Arena* arena, WDL_Str ttf_data);
     void (*terminate)(void* internal);
-    FPGlyph (*get_glyph)(void* internal, WDL_Arena* arena, u32 codepoint, u32 size);
+    u32 (*get_glyph_index)(void* internal, u32 codepoint);
+    FPGlyph (*get_glyph)(void* internal, WDL_Arena* arena, u32 glyph_index, u32 size);
     FontMetrics (*get_metrics)(void* internal, u32 size);
 };
 
@@ -225,14 +227,23 @@ static void ft2_terminate(void* internal) {
     FT_Done_FreeType(ft2->lib);
 }
 
-static FPGlyph ft2_get_glyph(void* internal, WDL_Arena* arena, u32 codepoint, u32 size) {
+static u32 ft2_get_glyph_index(void* internal, u32 codepoint) {
+    FT2Internal* ft2 = internal;
+    return FT_Get_Char_Index(ft2->face, codepoint);
+}
+
+static FPGlyph ft2_get_glyph(void* internal, WDL_Arena* arena, u32 glyph_index, u32 size) {
     (void) arena;
 
     FT2Internal* ft2 = internal;
     FT_Face face = ft2->face;
     FT_Set_Pixel_Sizes(face, 0, size);
 
-    FT_Load_Char(face, codepoint, FT_LOAD_RENDER);
+    FT_Error error = FT_Load_Glyph(face, glyph_index, FT_LOAD_RENDER);
+    if (error != FT_Err_Ok) {
+        wdl_error("FreeType2 glyph loading error!");
+    }
+
     FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
     FT_GlyphSlot slot = face->glyph;
     FT_Bitmap bm = slot->bitmap;
@@ -267,6 +278,7 @@ static FontMetrics ft2_get_metrics(void* internal, u32 size) {
 static const FontProvider FT2_PROVIDER = {
     .init = ft2_init,
     .terminate = ft2_terminate,
+    .get_glyph_index = ft2_get_glyph_index,
     .get_glyph = ft2_get_glyph,
     .get_metrics = ft2_get_metrics,
 };
@@ -283,8 +295,10 @@ struct SizedFont {
     u32 size;
     QuadtreeAtlas atlas_packer;
     GfxTexture atlas_texture;
-    WDL_HashMap* glyph_map;
     FontMetrics metrics;
+    // Key: u32 (glyph index)
+    // Value: Glyph
+    WDL_HashMap* glyph_map;
 };
 
 struct Font {
@@ -312,8 +326,8 @@ SizedFont sized_font_create(Font* font, u32 size) {
                 .format = GFX_TEXTURE_FORMAT_R_U8,
                 .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
             }),
-        .glyph_map = wdl_hm_new(wdl_hm_desc_generic(font->arena, 32, u32, Glyph)),
         .metrics = font->provider.get_metrics(internal, size),
+        .glyph_map = wdl_hm_new(wdl_hm_desc_generic(font->arena, 32, u32, Glyph)),
     };
     wdl_scratch_end(scratch);
     return sized;
@@ -352,13 +366,15 @@ Glyph font_get_glyph(Font* font, u32 codepoint) {
         return (Glyph) {0};
     }
 
-    Glyph* _glyph = wdl_hm_getp(sized->glyph_map, codepoint);
+    u32 glyph_index = font->provider.get_glyph_index(sized->internal, codepoint);
+    Glyph* _glyph = wdl_hm_getp(sized->glyph_map, glyph_index);
     if (_glyph != NULL) {
         return *_glyph;
     }
 
     WDL_Scratch scratch = wdl_scratch_begin(&font->arena, 1);
-    FPGlyph fp_glyph = font->provider.get_glyph(sized->internal, scratch.arena, codepoint, sized->size);
+    FPGlyph fp_glyph = font->provider.get_glyph(sized->internal, scratch.arena, glyph_index, sized->size);
+
     QuadtreeAtlasNode* node = quadtree_atlas_insert(&sized->atlas_packer, fp_glyph.bitmap.size);
     gfx_texture_subdata(sized->atlas_texture, (GfxTextureSubDataDesc) {
             .size = fp_glyph.bitmap.size,
@@ -379,7 +395,7 @@ Glyph font_get_glyph(Font* font, u32 codepoint) {
         .advance = fp_glyph.advance,
     };
 
-    wdl_hm_insert(sized->glyph_map, codepoint, glyph);
+    wdl_hm_insert(sized->glyph_map, glyph_index, glyph);
 
     return glyph;
 }

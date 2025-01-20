@@ -293,10 +293,10 @@ i32 main(void) {
 
     // -------------------------------------------------------------------------
 
-    // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"));
+    Font* font = font_create(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"));
     // Font* font = font_create(arena, wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"));
     // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"));
-    Font* font = font_create(arena, wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"));
+    // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"));
     font_set_size(font, 32);
 
     WDL_Arena* frame_arena = wdl_arena_create();
@@ -358,12 +358,24 @@ i32 main(void) {
 
         batch_begin(br, text_shader);
 
-        WDL_Str str = wdl_str_lit("!\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+        // WDL_Str str = wdl_str_lit("!\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+        // WDL_Str str = wdl_str_lit("The quick brown fox jumps over the lazy dog.");
+        WDL_Str str = wdl_str_lit("Forge of Titans");
         str_pos_timer += dt;
         if (str_pos < str.len && str_pos_timer >= 0.1f) {
             str_pos++;
             str_pos_timer = 0.0f;
         }
+
+        Glyph no = font_get_glyph(font, 78923);
+        Glyph no2 = font_get_glyph(font, 78924);
+        draw_quad_atlas(br, (Quad) {
+                .pos = wdl_v2(256, 256),
+                .size = no.size,
+                .texture = font_get_atlas(font),
+                .color = GFX_COLOR_WHITE,
+                .pivot = wdl_v2(-0.5f, 0.5f),
+            }, no.uv, ui_cam);
 
         FontMetrics metrics = font_get_metrics(font);
         // WDL_Str str = wdl_str_lit("Forge of Titans");
