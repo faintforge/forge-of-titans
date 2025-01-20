@@ -346,8 +346,9 @@ static FPGlyph fp_stbtt_get_glyph(void* internal, WDL_Arena* arena, u32 glyph_in
             .buffer = bitmap,
         },
         .size = glyph_size,
-        // .offset = wdl_v2(i0.x + floorf(lsb * scale), i0.y),
-        .offset = wdl_v2(i0.x, i0.y),
+        // .offset = wdl_v2(i0.x - floorf(lsb * scale), i0.y),
+        // .offset = wdl_v2(i0.x, i0.y),
+        .offset = wdl_v2(floorf(lsb * scale), i0.y),
     };
     return glyph;
 }
@@ -439,7 +440,8 @@ Font* font_create(WDL_Arena* arena, WDL_Str filename) {
     // Push a zero onto the arena so the 'ttf_data' string works as a cstr as
     // well.
     wdl_arena_push(arena, 1);
-    FontProvider provider = FT2_PROVIDER;
+    // FontProvider provider = FT2_PROVIDER;
+    FontProvider provider = STBTT_PROVIDER;
     *font = (Font) {
         .arena = arena,
         .provider = provider,
@@ -464,7 +466,6 @@ void font_set_size(Font* font, u32 size) {
 
 static void expand_atlas(Font* font, SizedFont* sized) {
     QuadtreeAtlas packer = quadtree_atlas_init(font->arena, wdl_iv2_muls(sized->atlas_packer.size, 2));
-    wdl_debug("Out of space, need to resize!");
 
     WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
     u8* bitmap = wdl_arena_push(scratch.arena, packer.size.x * packer.size.y);
@@ -586,4 +587,23 @@ void debug_font_atlas(const Font* font, Quad quad, Camera cam) {
     }
 
     quadtree_atlas_debug_draw(sized->atlas_packer, quad, cam);
+}
+
+WDL_Vec2 font_measure_string(Font* font, WDL_Str str) {
+    FontMetrics metrics = font_get_metrics(font);
+    WDL_Vec2 size = wdl_v2(0.0f, metrics.ascent - metrics.descent);
+
+    for (u32 i = 0; i < str.len; i++) {
+        Glyph glyph = font_get_glyph(font, str.data[i]);
+        if (i < str.len - 1) {
+            size.x += glyph.advance;
+        } else {
+            size.x += glyph.size.x;
+        }
+        if (i > 0) {
+            size.x += font_get_kerning(font, str.data[i-1], str.data[i]);
+        }
+    }
+
+    return size;
 }

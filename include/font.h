@@ -32,6 +32,7 @@ extern Glyph       font_get_glyph(Font* font, u32 codepoint);
 extern GfxTexture  font_get_atlas(const Font* font);
 extern FontMetrics font_get_metrics(const Font* font);
 extern f32         font_get_kerning(const Font* font, u32 left_codepoint, u32 right_codepoint);
+extern WDL_Vec2    font_measure_string(Font* font, WDL_Str str);
 
 extern void debug_font_atlas(const Font* font, Quad quad, Camera cam);
 

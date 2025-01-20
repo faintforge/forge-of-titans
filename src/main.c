@@ -297,7 +297,7 @@ i32 main(void) {
     // Font* font = font_create(arena, wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"));
     Font* font = font_create(arena, wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"));
     // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"));
-    font_set_size(font, 64);
+    font_set_size(font, 24);
 
     WDL_Arena* frame_arena = wdl_arena_create();
     DebugCtx dbg = {
@@ -349,52 +349,52 @@ i32 main(void) {
         //         .pivot = wdl_v2(-0.5f, 0.5f),
         //     }, ui_cam);
 
-        {
-            font_set_size(font, 32);
-            WDL_Vec2 size = wdl_v2s(camera.zoom);
-            WDL_Vec2 pos = wdl_v2_divs(wdl_v2s(camera.zoom), 2.0f);
-            pos.x = -pos.x;
-            debug_font_atlas(font, (Quad) {
-                    // .pos = wdl_v2(0, -256),
-                    // .size = wdl_v2(atlas_size.x, atlas_size.y),
-                    .pos = pos,
-                    .size = size,
-                    .texture = font_get_atlas(font),
-                    .color = GFX_COLOR_WHITE,
-                }, camera);
-        }
+        // {
+        //     WDL_Vec2 size = wdl_v2s(camera.zoom);
+        //     WDL_Vec2 pos = wdl_v2_divs(wdl_v2s(camera.zoom), 2.0f);
+        //     pos.x = -pos.x;
+        //     debug_font_atlas(font, (Quad) {
+        //             // .pos = wdl_v2(0, -256),
+        //             // .size = wdl_v2(atlas_size.x, atlas_size.y),
+        //             .pos = pos,
+        //             .size = size,
+        //             .texture = font_get_atlas(font),
+        //             .color = GFX_COLOR_WHITE,
+        //         }, camera);
+        // }
 
         batch_begin(br, text_shader);
 
         FontMetrics metrics = font_get_metrics(font);
 
-        // WDL_Str str = wdl_str_lit("!\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
-        WDL_Str str = wdl_str_lit("The quick brown fox jumps over the lazy dog.");
-        // WDL_Str str = wdl_str_lit("Forge of Titans");
+        WDL_Str str = wdl_str_lit("!\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+        // WDL_Str str = wdl_str_lit("The quick brown fox jumps over the lazy dog.");
+        // WDL_Str str = wdl_str_lit("| Forge of Titans |");
+        // WDL_Str str = wdl_str_lit("VAVA");
         str_pos_timer += dt;
-        str_pos = str.len;
         if (str_pos < str.len && str_pos_timer >= 0.1f) {
             str_pos++;
             str_pos_timer = 0.0f;
         }
 
         WDL_Vec2 pos = wdl_v2s(16.0f);
-        pos.y += metrics.ascent;
         pos.y = -pos.y;
-        for (u32 i = 0; i < str_pos; i++) {
-            if (i % 2) {
-                font_set_size(font, 32);
-            } else {
-                font_set_size(font, 64);
-            }
 
+        draw_quad(br, (Quad) {
+                .size = font_measure_string(font, str),
+                .pos = pos,
+                .color = GFX_COLOR_WHITE,
+                .pivot = wdl_v2(-0.5f, 0.5f),
+            }, ui_cam);
+
+        pos.y -= metrics.ascent;
+
+        for (u32 i = 0; i < str_pos; i++) {
             u8 codepoint = str.data[i];
             Glyph glyph = font_get_glyph(font, codepoint);
-            // WDL_Vec2 gpos = wdl_v2_add(pos, glyph.offset);
             WDL_Vec2 gpos = pos;
             gpos.x += glyph.offset.x;
             gpos.y -= glyph.offset.y;
-            // gpos.y -= metrics.ascent - glyph.size.y;
             // gpos.y += sinf(-wdl_os_get_time() * 2.0f + i / 5.0f) * metrics.ascent / 2.0f;
             draw_quad_atlas(br, (Quad) {
                     .pos = gpos,
