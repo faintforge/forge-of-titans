@@ -24,6 +24,13 @@ extern void assman_init(void);
 extern void assman_terminate(void);
 
 extern void asset_load(AssetDesc desc);
-extern void asset_get(WDL_Str name, AssetType type, void* output);
+
+#define asset_get(NAME, TYPE, RETURN_TYPE) ({ \
+        RETURN_TYPE result; \
+        _asset_get_impl((NAME), (TYPE), &result); \
+        result; \
+    })
+
+extern void _asset_get_impl(WDL_Str name, AssetType type, void* output);
 
 #endif // ASSMAN_H

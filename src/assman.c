@@ -43,7 +43,7 @@ struct AssetManager {
 
 static AssetManager assman = {0};
 
-static void* load_texture(AssetDesc desc) {
+static void* texture_load(AssetDesc desc) {
     WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
     const char* cstr = wdl_str_to_cstr(scratch.arena, desc.filepath);
     WDL_Ivec2 size;
@@ -65,10 +65,20 @@ static void* load_texture(AssetDesc desc) {
     return texture;
 }
 
+static void texture_unload(void* data) {
+    (void) data;
+    wdl_warn("Maybe implement texture unloading!");
+}
+
 static void* font_load(AssetDesc desc) {
     Font** font = wdl_arena_push_no_zero(assman.arena, sizeof(Font*));
     *font = font_create(assman.arena, desc.filepath);
     return font;
+}
+
+static void font_unload(void* data) {
+    Font** font = data;
+    font_destroy(*font);
 }
 
 void assman_init(void) {
@@ -81,12 +91,13 @@ void assman_init(void) {
         .loaders = {
             [ASSET_TYPE_TEXTURE] = {
                 .asset_size = sizeof(GfxTexture),
-                .load = load_texture,
+                .load = texture_load,
+                .unload = texture_unload,
             },
             [ASSET_TYPE_FONT] = {
                 .asset_size = sizeof(Font*),
                 .load = font_load,
-                .unload = (void (*)(void*)) font_destroy,
+                .unload = font_unload,
             },
         },
         .asset_map = wdl_hm_new(wdl_hm_desc_str(arena, 512, Asset)),
@@ -102,6 +113,8 @@ void assman_terminate(void) {
         assman.loaders[asset->type].unload(asset->data);
         iter = wdl_hm_iter_next(iter);
     }
+
+    wdl_arena_destroy(assman.arena);
 }
 
 void asset_load(AssetDesc desc) {
@@ -118,7 +131,7 @@ void asset_load(AssetDesc desc) {
     }
 }
 
-void asset_get(WDL_Str name, AssetType type, void* output) {
+void _asset_get_impl(WDL_Str name, AssetType type, void* output) {
     wdl_assert(assman.inited, "Asset manager not initialized.");
     wdl_assert(type < ASSET_TYPE_COUNT, "Unknown asset type.");
 

@@ -9,14 +9,19 @@
 #include "font.h"
 #include "assman.h"
 
+#include "game.h"
+
+typedef struct GeometryPassData GeometryPassData;
+struct GeometryPassData {
+    BatchRenderer* br;
+    GfxShader shader;
+    GameState* game_state;
+};
+
 typedef struct State State;
 struct State {
     RenderPipeline pipeline;
-};
-
-static Camera camera = {
-    .zoom = 15.0f,
-    .pos = {0.0f, 0.0f},
+    GameState game_state;
 };
 
 typedef struct FullscreenQuad FullscreenQuad;
@@ -106,13 +111,6 @@ static void resize_screen_texture(RenderPassDesc* desc, WDL_Ivec2 size) {
     resize_viewport(desc, small);
 }
 
-typedef struct GeometryPassData GeometryPassData;
-struct GeometryPassData {
-    BatchRenderer* br;
-    GfxShader shader;
-    GfxTexture texture;
-};
-
 static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void* user_data) {
     (void) inputs;
     (void) input_count;
@@ -120,46 +118,41 @@ static void geometry_pass_execute(const GfxTexture* inputs, u8 input_count, void
     prof_begin(wdl_str_lit("Geometry pass"));
 
     GeometryPassData* data = user_data;
+    GameState* gs = data->game_state;
     BatchRenderer* br = data->br;
 
-    gfx_clear(GFX_COLOR_BLACK);
+    // gfx_clear(GFX_COLOR_BLACK);
     batch_begin(br, data->shader);
 
-    draw_quad(br, (Quad) {
-            .size = wdl_v2(5, 5),
-            .rotation = 3.14f / 8.0f,
-            .color = GFX_COLOR_WHITE,
-        }, camera);
-
-    const WDL_Ivec2 grid = wdl_iv2(10, 10);
-    for (i32 y = 0; y < grid.y; y++) {
-        for (i32 x = 0; x < grid.x; x++) {
-            WDL_Vec2 pos = wdl_v2(x, y);
-            pos = wdl_v2_sub(pos, wdl_v2_divs(wdl_v2(grid.x - 1, grid.y - 1), 2.0f));
-
-            f32 offset = (x + y) / 5.0f;
-
-            draw_quad(br, (Quad) {
-                    .pos = pos,
-                    .size = wdl_v2_normalized(wdl_v2s(1.0f)),
-                    .rotation = offset + wdl_os_get_time(),
-                    .color = gfx_color_hsv((offset + wdl_os_get_time()) * 90.0f, 0.75f, 1.0f),
-                    .texture = data->texture,
-                }, camera);
-        }
-    }
-
-    GfxTexture player;
-    asset_get(wdl_str_lit("player"), ASSET_TYPE_TEXTURE, &player);
-    WDL_Ivec2 size = gfx_texture_get_size(player);
+    GfxTexture bg = asset_get(wdl_str_lit("sky_bg"), ASSET_TYPE_TEXTURE, GfxTexture);
+    WDL_Ivec2 size = gfx_texture_get_size(bg);
     f32 aspect = (f32) size.x / (f32) size.y;
     draw_quad(br, (Quad) {
-            .pos = wdl_v2s(0.0f),
-            .size = wdl_v2_muls(wdl_v2(aspect, 1.0f), 5.0f),
-            .rotation = 0.0f,
+            .size = wdl_v2(gs->cam.zoom * aspect, gs->cam.zoom),
             .color = GFX_COLOR_WHITE,
-            .texture = player,
-        }, camera);
+            .texture = bg,
+        }, gs->cam);
+
+    for (u32 i = 0; i < wdl_arrlen(gs->entites); i++) {
+        Entity* ent = &gs->entites[i];
+        if (!(ent->flags & (ENTITY_FLAG_ALIVE | ENTITY_FLAG_RENDERABLE))) {
+            continue;
+        }
+
+        Quad quad = {
+            .pos = ent->pos,
+            .size = ent->size,
+            .pivot = ent->pivot,
+            .rotation = ent->rot,
+            .color = ent->color,
+            .texture = ent->texture,
+        };
+        if (ent->use_atlas) {
+            draw_quad_atlas(br, quad, ent->uvs, gs->cam);
+        } else {
+            draw_quad(br, quad, gs->cam);
+        }
+    }
 
     batch_end(br);
     prof_end();
@@ -209,101 +202,10 @@ i32 main(void) {
     }
     prof_end(); // Graphics init
 
-    assman_init();
-
-    // -------------------------------------------------------------------------
-
-    FullscreenQuad fsq = fullscreen_quad_new();
-    BatchRenderer* br = batch_renderer_new(arena, 8194);
-
-    WDL_Scratch scratch = wdl_scratch_begin(&arena, 1);
-    WDL_Str vertex_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/batch.vert.glsl"));
-    WDL_Str fragment_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/geometry.frag.glsl"));
-
-    GfxShader geometry_shader = gfx_shader_new(vertex_source, fragment_source);
-    gfx_shader_use(geometry_shader);
-    i32 samplers[32] = {0};
-    for (u32 i = 0; i < wdl_arrlen(samplers); i++) {
-        samplers[i] = i;
-    }
-    gfx_shader_uniform_i32_arr(geometry_shader, wdl_str_lit("textures"), samplers, wdl_arrlen(samplers));
-
-    fragment_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/text.frag.glsl"));
-    GfxShader text_shader = gfx_shader_new(vertex_source, fragment_source);
-    gfx_shader_use(text_shader);
-    gfx_shader_uniform_i32_arr(text_shader, wdl_str_lit("textures"), samplers, wdl_arrlen(samplers));
-
-    wdl_scratch_end(scratch);
-
-    GfxTexture checker_texture;
-    {
-        const WDL_Ivec2 size = {2, 2};
-        u8 pixels[size.x*size.y*4];
-        for (i32 y = 0; y < size.y; y++) {
-            for (i32 x = 0; x < size.x; x++) {
-                u8 color = ((x + y) % 2) * 128 + 127;
-
-                pixels[(x + y * size.x) * 4 + 0] = color;
-                pixels[(x + y * size.x) * 4 + 1] = color;
-                pixels[(x + y * size.x) * 4 + 2] = color;
-                pixels[(x + y * size.x) * 4 + 3] = 255;
-            }
-        }
-        checker_texture = gfx_texture_new((GfxTextureDesc) {
-                .data = pixels,
-                .size = size,
-                .format = GFX_TEXTURE_FORMAT_RGBA_U8,
-                .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
-            });
-    }
-
-    GeometryPassData geometry_data = {
-        .br = br,
-        .shader = geometry_shader,
-        .texture = checker_texture,
-    };
-
-    // -------------------------------------------------------------------------
-
-    GfxTexture texture = gfx_texture_new((GfxTextureDesc) {
-            .data = NULL,
-            .size = window_get_size(window),
-            .format = GFX_TEXTURE_FORMAT_RGB_U8,
-            .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
-        });
-
-    RenderPass geometry_pass = render_pass_new((RenderPassDesc) {
-            .execute = geometry_pass_execute,
-            .user_data = &geometry_data,
-
-            .resize = resize_screen_texture,
-            .screen_size_dependant = true,
-
-            .viewport = gfx_texture_get_size(texture),
-            .targets = {texture},
-            .target_count = 1,
-
-            .inputs = {},
-            .input_count = 0,
-        });
-
-    RenderPass blit_pass = render_pass_new((RenderPassDesc) {
-            .execute = blit_pass_execute,
-            .user_data = &fsq,
-
-            .inputs = {texture},
-            .input_count = 1,
-
-            .viewport = window_get_size(window),
-            .screen_size_dependant = true,
-            .resize = resize_viewport,
-        });
-
-    render_pipeline_add_pass(&state.pipeline, geometry_pass);
-    render_pipeline_add_pass(&state.pipeline, blit_pass);
-
     prof_begin(wdl_str_lit("Asset loading"));
     {
+        assman_init();
+
         prof_begin(wdl_str_lit("Fonts"));
         asset_load((AssetDesc) {
                 .name = wdl_str_lit("roboto"),
@@ -334,12 +236,103 @@ i32 main(void) {
                 .type = ASSET_TYPE_TEXTURE,
                 .texture_sampler = GFX_TEXTURE_SAMPLER_NEAREST,
             });
+        asset_load((AssetDesc) {
+                .name = wdl_str_lit("sky_bg"),
+                .filepath = wdl_str_lit("assets/textures/sky_bg.png"),
+                .type = ASSET_TYPE_TEXTURE,
+                .texture_sampler = GFX_TEXTURE_SAMPLER_NEAREST,
+            });
         prof_end(); // Textures
     }
     prof_end(); // Asset loading
+
+    // -------------------------------------------------------------------------
+
+    FullscreenQuad fsq = fullscreen_quad_new();
+    BatchRenderer* br = batch_renderer_new(arena, 8194);
+
+    WDL_Scratch scratch = wdl_scratch_begin(&arena, 1);
+    WDL_Str vertex_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/batch.vert.glsl"));
+    WDL_Str fragment_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/geometry.frag.glsl"));
+
+    GfxShader geometry_shader = gfx_shader_new(vertex_source, fragment_source);
+    gfx_shader_use(geometry_shader);
+    i32 samplers[32] = {0};
+    for (u32 i = 0; i < wdl_arrlen(samplers); i++) {
+        samplers[i] = i;
+    }
+    gfx_shader_uniform_i32_arr(geometry_shader, wdl_str_lit("textures"), samplers, wdl_arrlen(samplers));
+
+    fragment_source = read_file(scratch.arena, wdl_str_lit("assets/shaders/text.frag.glsl"));
+    GfxShader text_shader = gfx_shader_new(vertex_source, fragment_source);
+    gfx_shader_use(text_shader);
+    gfx_shader_uniform_i32_arr(text_shader, wdl_str_lit("textures"), samplers, wdl_arrlen(samplers));
+
+    wdl_scratch_end(scratch);
+
+    // -------------------------------------------------------------------------
+
+    GfxTexture geometry_pass_target = gfx_texture_new((GfxTextureDesc) {
+            .data = NULL,
+            .size = window_get_size(window),
+            .format = GFX_TEXTURE_FORMAT_RGB_U8,
+            .sampler = GFX_TEXTURE_SAMPLER_NEAREST,
+        });
+
+    GeometryPassData gp_data = {
+        .br = br,
+        .shader = geometry_shader,
+        .game_state = &state.game_state,
+    };
+    RenderPass geometry_pass = render_pass_new((RenderPassDesc) {
+            .execute = geometry_pass_execute,
+            .user_data = &gp_data,
+
+            .resize = resize_screen_texture,
+            .screen_size_dependant = true,
+
+            .viewport = gfx_texture_get_size(geometry_pass_target),
+            .targets = {geometry_pass_target},
+            .target_count = 1,
+
+            .inputs = {},
+            .input_count = 0,
+        });
+
+    RenderPass blit_pass = render_pass_new((RenderPassDesc) {
+            .execute = blit_pass_execute,
+            .user_data = &fsq,
+
+            .inputs = {geometry_pass_target},
+            .input_count = 1,
+
+            .viewport = window_get_size(window),
+            .screen_size_dependant = true,
+            .resize = resize_viewport,
+        });
+
+    render_pipeline_add_pass(&state.pipeline, geometry_pass);
+    render_pipeline_add_pass(&state.pipeline, blit_pass);
+
     prof_end(); // Startup
 
     profiler_dump_frame();
+
+    // Player
+    state.game_state.cam = (Camera) {
+        .screen_size = window_get_size(window),
+        .zoom = 12.0f,
+    };
+
+    GfxTexture player = asset_get(wdl_str_lit("player"), ASSET_TYPE_TEXTURE, GfxTexture);
+    WDL_Ivec2 size = gfx_texture_get_size(player);
+    f32 aspect = (f32) size.x / (f32) size.y;
+    state.game_state.entites[0] = (Entity) {
+        .size = wdl_v2(aspect, 1.0f),
+        .color = GFX_COLOR_WHITE,
+        .flags = ENTITY_FLAG_ALIVE | ENTITY_FLAG_RENDERABLE,
+        .texture = player,
+    };
 
     // -------------------------------------------------------------------------
 
@@ -371,41 +364,10 @@ i32 main(void) {
         wdl_arena_clear(frame_arena);
         debug_ctx_push(&dbg);
 
+        state.game_state.cam.screen_size = window_get_size(window);
+
         prof_begin(wdl_str_lit("Rendering"));
-        camera.screen_size = window_get_size(window);
         render_pipeline_execute(&state.pipeline);
-
-        WDL_Ivec2 screen_size = window_get_size(window);
-        Camera ui_cam = {
-            .screen_size = screen_size,
-            .zoom = screen_size.y,
-            .pos = wdl_v2(screen_size.x / 2.0f, -screen_size.y / 2.0f),
-            .invert_y = true,
-        };
-        batch_begin(br, text_shader);
-
-        Font* font = NULL;
-        asset_get(wdl_str_lit("tiny5"), ASSET_TYPE_FONT, &font);
-        font_set_size(font, 32);
-        WDL_Str str = wdl_str_lit("Forge of Titans");
-        FontMetrics metrics = font_get_metrics(font);
-        WDL_Vec2 pos = wdl_v2(32.0f, 32.0f + metrics.ascent);
-        for (u32 i = 0; i < str.len; i++) {
-            Glyph glyph = font_get_glyph(font, str.data[i]);
-            draw_quad_atlas(br, (Quad) {
-                    .pos = wdl_v2_add(pos, glyph.offset),
-                    .size = glyph.size,
-                    .pivot = wdl_v2(-0.5f, -0.5f),
-                    .color = GFX_COLOR_WHITE,
-                    .texture = font_get_atlas(font),
-                }, glyph.uv, ui_cam);
-            pos.x += glyph.advance;
-            if (i > 0) {
-                pos.x += font_get_kerning(font, str.data[i - 1], str.data[i]);
-            }
-        }
-
-        batch_end(br);
 
         batch_begin(br, geometry_shader);
         debug_ctx_execute(&dbg, br);
