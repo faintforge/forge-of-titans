@@ -193,6 +193,7 @@ struct FontProvider {
     u32 (*get_glyph_index)(void* internal, u32 codepoint);
     FPGlyph (*get_glyph)(void* internal, WDL_Arena* arena, u32 glyph_index, u32 size);
     FontMetrics (*get_metrics)(void* internal, u32 size);
+    i32 (*get_kerning)(void* internal, u32 left_glyph, u32 right_glyph, u32 size);
 };
 
 // -- FreeType2 font provider --------------------------------------------------
@@ -274,12 +275,22 @@ static FontMetrics ft2_get_metrics(void* internal, u32 size) {
     return metrics;
 }
 
+static i32 ft2_get_kerning(void* internal, u32 left_glyph, u32 right_glyph, u32 size) {
+    FT2Internal* ft2 = internal;
+    FT_Face face = ft2->face;
+    FT_Set_Pixel_Sizes(face, 0, size);
+    FT_Vector kern;
+    FT_Get_Kerning(face, left_glyph, right_glyph, FT_KERNING_DEFAULT, &kern);
+    return kern.x >> 6;
+}
+
 static const FontProvider FT2_PROVIDER = {
     .init = ft2_init,
     .terminate = ft2_terminate,
     .get_glyph_index = ft2_get_glyph_index,
     .get_glyph = ft2_get_glyph,
     .get_metrics = ft2_get_metrics,
+    .get_kerning = ft2_get_kerning,
 };
 
 FontProvider font_provider_get_ft2(void) {
@@ -480,6 +491,18 @@ FontMetrics font_get_metrics(const Font* font) {
     }
 
     return sized->metrics;
+}
+
+f32 font_get_kerning(const Font* font, u32 left_codepoint, u32 right_codepoint) {
+    SizedFont* sized = wdl_hm_getp(font->map, font->curr_size);
+    if (sized == NULL) {
+        wdl_error("Font of size %u hasn't been created.", font->curr_size);
+        return 0.0f;
+    }
+
+    u32 left_glyph = font->provider.get_glyph_index(sized->internal, left_codepoint);
+    u32 right_glyph = font->provider.get_glyph_index(sized->internal, right_codepoint);
+    return font->provider.get_kerning(sized->internal, left_glyph, right_glyph, font->curr_size);
 }
 
 void debug_font_atlas(const Font* font, Quad quad, Camera cam) {

@@ -293,8 +293,8 @@ i32 main(void) {
 
     // -------------------------------------------------------------------------
 
-    // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"));
-    Font* font = font_create(arena, wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"));
+    Font* font = font_create(arena, wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"));
+    // Font* font = font_create(arena, wdl_str_lit("assets/fonts/soulside/SoulsideBetrayed-3lazX.ttf"));
     // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"));
     // Font* font = font_create(arena, wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"));
     font_set_size(font, 128);
@@ -349,70 +349,93 @@ i32 main(void) {
         //         .pivot = wdl_v2(-0.5f, 0.5f),
         //     }, ui_cam);
 
-        // WDL_Ivec2 atlas_size = gfx_texture_get_size(font_get_atlas(font));
-        {
-            WDL_Vec2 size = wdl_v2s(camera.zoom);
-            WDL_Vec2 pos = wdl_v2_divs(wdl_v2s(camera.zoom), 2.0f);
-            pos.x = -pos.x;
-            debug_font_atlas(font, (Quad) {
-                    // .pos = wdl_v2(0, -256),
-                    // .size = wdl_v2(atlas_size.x, atlas_size.y),
-                    .pos = pos,
-                    .size = size,
-                    .texture = font_get_atlas(font),
-                    .color = GFX_COLOR_WHITE,
-                    }, camera);
-        }
+        // {
+        //     WDL_Vec2 size = wdl_v2s(camera.zoom);
+        //     WDL_Vec2 pos = wdl_v2_divs(wdl_v2s(camera.zoom), 2.0f);
+        //     pos.x = -pos.x;
+        //     debug_font_atlas(font, (Quad) {
+        //             // .pos = wdl_v2(0, -256),
+        //             // .size = wdl_v2(atlas_size.x, atlas_size.y),
+        //             .pos = pos,
+        //             .size = size,
+        //             .texture = font_get_atlas(font),
+        //             .color = GFX_COLOR_WHITE,
+        //             }, camera);
+        // }
 
         batch_begin(br, text_shader);
 
-        WDL_Str str = wdl_str_lit("!\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
-        // WDL_Str str = wdl_str_lit("The quick brown fox jumps over the lazy dog.");
-        // WDL_Str str = wdl_str_lit("Forge of Titans");
-        str_pos_timer += dt;
-        if (str_pos < str.len && str_pos_timer >= 0.1f) {
-            str_pos++;
-            str_pos_timer = 0.0f;
-        }
+        // WDL_Str str = wdl_str_lit("!\"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~");
+        // // WDL_Str str = wdl_str_lit("The quick brown fox jumps over the lazy dog.");
+        // // WDL_Str str = wdl_str_lit("Forge of Titans");
+        // str_pos_timer += dt;
+        // if (str_pos < str.len && str_pos_timer >= 0.1f) {
+        //     str_pos++;
+        //     str_pos_timer = 0.0f;
+        // }
+        //
+        // Glyph no = font_get_glyph(font, 78923);
+        // Glyph no2 = font_get_glyph(font, 78924);
+        // draw_quad_atlas(br, (Quad) {
+        //         .pos = wdl_v2(256, -256),
+        //         .size = no.size,
+        //         .texture = font_get_atlas(font),
+        //         .color = GFX_COLOR_WHITE,
+        //         .pivot = wdl_v2(-0.5f, 0.5f),
+        //     }, no.uv, ui_cam);
+        //
+        // draw_quad_atlas(br, (Quad) {
+        //         .pos = wdl_v2(256 + no.advance, -256),
+        //         .size = no2.size,
+        //         .texture = font_get_atlas(font),
+        //         .color = GFX_COLOR_WHITE,
+        //         .pivot = wdl_v2(-0.5f, 0.5f),
+        //     }, no2.uv, ui_cam);
+        //
+        // FontMetrics metrics = font_get_metrics(font);
+        // // WDL_Str str = wdl_str_lit("Forge of Titans");
+        // WDL_Vec2 pos = wdl_v2s(16.0f);
+        // pos.y += metrics.ascent;
+        // pos.y = -pos.y;
+        // for (u32 i = 0; i < str_pos; i++) {
+        //     u8 codepoint = str.data[i];
+        //     Glyph glyph = font_get_glyph(font, codepoint);
+        //     WDL_Vec2 gpos = wdl_v2_add(pos, glyph.offset);
+        //     gpos.y += sinf(-wdl_os_get_time() * 2.0f + i / 5.0f) * metrics.ascent / 2.0f;
+        //     draw_quad_atlas(br, (Quad) {
+        //             .pos = gpos,
+        //             .size = glyph.size,
+        //             .texture = font_get_atlas(font),
+        //             .color = gfx_color_hsv(-wdl_os_get_time() * 90.0f + i * 5.0f, 0.75f, 1.0f),
+        //             .pivot = wdl_v2(-0.5f, 0.5f),
+        //         }, glyph.uv, ui_cam);
+        //
+        //     pos.x += glyph.advance;
+        // }
 
-        Glyph no = font_get_glyph(font, 78923);
-        Glyph no2 = font_get_glyph(font, 78924);
+        Glyph A = font_get_glyph(font, 'A');
+        Glyph V = font_get_glyph(font, 'V');
+
+        WDL_Vec2 pos = wdl_v2(32, 32);
+        A.offset.y = -A.offset.y;
+        V.offset.y = -V.offset.y;
         draw_quad_atlas(br, (Quad) {
-                .pos = wdl_v2(256, -256),
-                .size = no.size,
+                .pos = wdl_v2_add(pos, A.offset),
+                .size = A.size,
                 .texture = font_get_atlas(font),
                 .color = GFX_COLOR_WHITE,
                 .pivot = wdl_v2(-0.5f, 0.5f),
-            }, no.uv, ui_cam);
-
+            }, A.uv, ui_cam);
+        f32 kern = font_get_kerning(font, 'A', 'V');
+        wdl_debug("Kerning: %f", kern);
+        pos.x += A.advance;
         draw_quad_atlas(br, (Quad) {
-                .pos = wdl_v2(256 + no.advance, -256),
-                .size = no2.size,
+                .pos = wdl_v2_add(pos, V.offset),
+                .size = V.size,
                 .texture = font_get_atlas(font),
                 .color = GFX_COLOR_WHITE,
                 .pivot = wdl_v2(-0.5f, 0.5f),
-            }, no2.uv, ui_cam);
-
-        FontMetrics metrics = font_get_metrics(font);
-        // WDL_Str str = wdl_str_lit("Forge of Titans");
-        WDL_Vec2 pos = wdl_v2s(16.0f);
-        pos.y += metrics.ascent;
-        pos.y = -pos.y;
-        for (u32 i = 0; i < str_pos; i++) {
-            u8 codepoint = str.data[i];
-            Glyph glyph = font_get_glyph(font, codepoint);
-            WDL_Vec2 gpos = wdl_v2_add(pos, glyph.offset);
-            gpos.y += sinf(-wdl_os_get_time() * 2.0f + i / 5.0f) * metrics.ascent / 2.0f;
-            draw_quad_atlas(br, (Quad) {
-                    .pos = gpos,
-                    .size = glyph.size,
-                    .texture = font_get_atlas(font),
-                    .color = gfx_color_hsv(-wdl_os_get_time() * 90.0f + i * 5.0f, 0.75f, 1.0f),
-                    .pivot = wdl_v2(-0.5f, 0.5f),
-                }, glyph.uv, ui_cam);
-
-            pos.x += glyph.advance;
-        }
+            }, V.uv, ui_cam);
 
         debug_ctx_execute(&dbg, br);
         debug_ctx_reset(&dbg);
