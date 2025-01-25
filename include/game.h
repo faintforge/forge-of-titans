@@ -2,8 +2,8 @@
 #define GAME_H
 
 #include "waddle.h"
-#include "graphics.h"
-#include "renderer.h"
+#include "engine/graphics.h"
+#include "engine/renderer.h"
 
 typedef enum EntityFlags {
     ENTITY_FLAG_ALIVE = 1 << 0,

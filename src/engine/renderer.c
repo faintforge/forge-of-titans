@@ -1,6 +1,5 @@
-#include "renderer.h"
-#include "graphics.h"
-#include "waddle.h"
+#include "engine/renderer.h"
+#include "engine/graphics.h"
 
 // -- Render pass --------------------------------------------------------------
 

@@ -1,7 +1,6 @@
-#include "assman.h"
-#include "graphics.h"
-#include "waddle.h"
-#include "font.h"
+#include "engine/assman.h"
+#include "engine/graphics.h"
+#include "engine/font.h"
 
 #include <string.h>
 

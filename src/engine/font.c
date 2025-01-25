@@ -1,8 +1,7 @@
-#include "font.h"
-#include "graphics.h"
-#include "renderer.h"
-#include "waddle.h"
-#include "utils.h"
+#include "engine/font.h"
+#include "engine/graphics.h"
+#include "engine/renderer.h"
+#include "engine/utils.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H

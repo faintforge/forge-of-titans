@@ -1,13 +1,12 @@
 #define WADDLE_IMPLEMENTATION
 #include "waddle.h"
 
-#include "window.h"
-#include "graphics.h"
-#include "renderer.h"
-#include "utils.h"
-#include "profiler.h"
-#include "font.h"
-#include "assman.h"
+#include "engine/window.h"
+#include "engine/graphics.h"
+#include "engine/renderer.h"
+#include "engine/utils.h"
+#include "engine/profiler.h"
+#include "engine/assman.h"
 
 #include "game.h"
 
@@ -167,7 +166,7 @@ static void blit_pass_execute(const GfxTexture* inputs, u8 input_count, void* us
 }
 
 i32 main(void) {
-    wdl_init();
+    wdl_init(WDL_CONFIG_DEFAULT);
     profiler_init();
 
     prof_begin(wdl_str_lit("Startup"));

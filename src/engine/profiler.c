@@ -1,5 +1,4 @@
-#include "profiler.h"
-#include "waddle.h"
+#include "engine/profiler.h"
 
 typedef struct Entry Entry;
 struct Entry {
