@@ -35,11 +35,9 @@ struct Game {
     Camera cam;
 };
 
-void app_startup(EngineCtx* ctx) {
-    WDL_Arena* persistent = ctx->persistent_arena;
-    Game* game = wdl_arena_push(persistent, sizeof(Game));
-    ctx->user_ptr = game;
+static Game game;
 
+void app_startup(void) {
     //
     // Assets
     //
@@ -67,14 +65,14 @@ void app_startup(EngineCtx* ctx) {
             .type = ASSET_TYPE_FONT,
         });
 
-    game->cam = (Camera) {
+    game.cam = (Camera) {
         .zoom = 32.0f,
         .pos = wdl_v2(0.0f, 0.0f),
         .invert_y = false,
     };
 
     // Player
-    game->entities[0] = (Entity) {
+    game.entities[0] = (Entity) {
         .type = ENTITY_PLAYER,
         .alive = true,
 
@@ -92,21 +90,20 @@ void app_startup(EngineCtx* ctx) {
 #define sign(V) ((V) > 0 ? 1 : (V) < 0 ? -1 : 0)
 #define lerp(A, B, T) ((A) + ((B) - (A)) * (T))
 
-void app_update(EngineCtx* ctx) {
-    Game* game = ctx->user_ptr;
-    Renderer* renderer = ctx->renderer;
-    game->cam.screen_size = ctx->window_size;
+void app_update(void) {
+    Renderer* renderer = get_renderer();
+    game.cam.screen_size = get_screen_size();
 
     // Delta time
     static f32 last = 0.0f;
     f32 curr = wdl_os_get_time();
-    game->dt = curr - last;
+    game.dt = curr - last;
     last = curr;
 
     // FPS
     static f32 fps_timer = 0.0f;
     static u32 fps = 0;
-    fps_timer += game->dt;
+    fps_timer += game.dt;
     fps++;
     if (fps_timer >= 1.0f) {
         wdl_info("FPS: %u", fps);
@@ -115,8 +112,8 @@ void app_update(EngineCtx* ctx) {
     }
 
     // Player controller
-    for (u32 i = 0; i < wdl_arrlen(game->entities); i++) {
-        Entity* ent = &game->entities[i];
+    for (u32 i = 0; i < wdl_arrlen(game.entities); i++) {
+        Entity* ent = &game.entities[i];
         if (!ent->alive || ent->type != ENTITY_PLAYER) {
             continue;
         }
@@ -124,7 +121,7 @@ void app_update(EngineCtx* ctx) {
         //
         // Gravity
         //
-        ent->vel.y -= 9.82f * game->dt * 5.0f;
+        ent->vel.y -= 9.82f * game.dt * 10.0f;
 
         //
         // Horizontal movement
@@ -133,45 +130,45 @@ void app_update(EngineCtx* ctx) {
         const f32 acc = 80.0f;
         const f32 turn_boost = 150.0f;
         const f32 dec = 100.0f;
-        const f32 jump_height = 20.0f;
+        const f32 jump_height = 30.0f;
 
         // Input
         f32 hori = 0.0f;
-        hori -= key_down(ctx, KEY_A);
-        hori += key_down(ctx, KEY_D);
+        hori -= key_down(KEY_A);
+        hori += key_down(KEY_D);
 
         // Accelerate
         if (hori != 0.0f) {
             // Turn
             if (sign(hori) != sign(ent->vel.x) && ent->vel.x != 0.0f) {
-                ent->vel.x += turn_boost * hori * game->dt;
+                ent->vel.x += turn_boost * hori * game.dt;
             }
 
-            ent->vel.x += acc * hori * game->dt;
+            ent->vel.x += acc * hori * game.dt;
             ent->vel.x = wdl_clamp(ent->vel.x, -max_speed, max_speed);
         } else {
-            if (fabsf(ent->vel.x) < dec * game->dt) {
+            if (fabsf(ent->vel.x) < dec * game.dt) {
                 ent->vel.x = 0.0f;
             } else {
-                ent->vel.x -= dec * sign(ent->vel.x) * game->dt;
+                ent->vel.x -= dec * sign(ent->vel.x) * game.dt;
             }
         }
 
         //
         // Vertical movement
         //
-        if (key_down(ctx, KEY_SPACE) && ent->grounded) {
+        if (key_down(KEY_SPACE) && ent->grounded) {
             ent->vel.y = jump_height;
             ent->grounded = false;
         }
 
         // Variable jump height
-        if (!key_down(ctx, KEY_SPACE) && ent->vel.y > 0.0f) {
-            ent->vel.y -= 50.0f * game->dt;
+        if (!key_down(KEY_SPACE) && ent->vel.y > 0.0f) {
+            ent->vel.y -= 50.0f * game.dt;
         }
 
         // Move
-        ent->pos = wdl_v2_add(ent->pos, wdl_v2_muls(ent->vel, game->dt));
+        ent->pos = wdl_v2_add(ent->pos, wdl_v2_muls(ent->vel, game.dt));
 
         i8 facing = sign(ent->vel.x);
         if (facing != 0) {
@@ -186,23 +183,23 @@ void app_update(EngineCtx* ctx) {
         }
 
         // Camera follow
-        game->cam.pos.x = lerp(game->cam.pos.x, ent->pos.x, game->dt * 4.0f);
-        game->cam.pos.y = lerp(game->cam.pos.y, ent->pos.y, game->dt * 4.0f);
+        game.cam.pos.x = lerp(game.cam.pos.x, ent->pos.x, game.dt * 4.0f);
+        game.cam.pos.y = lerp(game.cam.pos.y, ent->pos.y, game.dt * 4.0f);
     }
 
-    if (key_down(ctx, KEY_DOWN)) {
-        game->cam.zoom += 100.0f * game->dt;
+    if (key_down(KEY_DOWN)) {
+        game.cam.zoom += 100.0f * game.dt;
     }
-    if (key_down(ctx, KEY_UP)) {
-        game->cam.zoom -= 100.0f * game->dt;
+    if (key_down(KEY_UP)) {
+        game.cam.zoom -= 100.0f * game.dt;
     }
 
     // Rendering
-    renderer_begin(renderer, game->cam);
+    renderer_begin(renderer, game.cam);
 
-    f32 aspect = (f32) game->cam.screen_size.x / (f32) game->cam.screen_size.y;
-    WDL_Vec2 full_screen_quad_size = wdl_v2(aspect * game->cam.zoom, game->cam.zoom + 2.0f);
-    renderer_draw_quad_textured(renderer, wdl_v2s(0.0f), game->cam.pos, full_screen_quad_size, 0.0, COLOR_WHITE, asset_get(wdl_str_lit("sky"), ASSET_TYPE_TEXTURE, GfxTexture));
+    f32 aspect = (f32) game.cam.screen_size.x / (f32) game.cam.screen_size.y;
+    WDL_Vec2 full_screen_quad_size = wdl_v2(aspect * game.cam.zoom, game.cam.zoom + 2.0f);
+    renderer_draw_quad_textured(renderer, wdl_v2s(0.0f), game.cam.pos, full_screen_quad_size, 0.0, COLOR_WHITE, asset_get(wdl_str_lit("sky"), ASSET_TYPE_TEXTURE, GfxTexture));
 
     const WDL_Ivec2 grid = wdl_iv2(100, 4);
     for (i32 y = 0; y < grid.y; y++) {
@@ -219,8 +216,8 @@ void app_update(EngineCtx* ctx) {
         }
     }
 
-    for (u32 i = 0; i < wdl_arrlen(game->entities); i++) {
-        Entity* ent = &game->entities[i];
+    for (u32 i = 0; i < wdl_arrlen(game.entities); i++) {
+        Entity* ent = &game.entities[i];
         if (!ent->alive || !ent->renderable) {
             continue;
         }
@@ -230,8 +227,7 @@ void app_update(EngineCtx* ctx) {
     renderer_end(renderer);
 }
 
-void app_shutdown(EngineCtx* ctx) {
-    (void) ctx;
+void app_shutdown(void) {
     wdl_dump_arena_metrics();
 }
 

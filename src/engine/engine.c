@@ -11,11 +11,18 @@
 
 static Renderer* renderer_init(WDL_Arena* arena, u32 max_quad_count);
 
-struct EngineInternal {
-    WDL_Arena* frame_arenas[2];
+typedef struct Engine Engine;
+struct Engine {
+    struct {
+        WDL_Arena* persistent;
+        WDL_Arena* frame[2];
+        u8 curr_frame;
+    } arenas;
     Window* window;
-    u8 curr_frame;
+    Renderer* renderer;
 };
+
+static Engine engine = {0};
 
 i32 engine_run(ApplicationDesc app_desc) {
     wdl_init(WDL_CONFIG_DEFAULT);
@@ -54,38 +61,32 @@ i32 engine_run(ApplicationDesc app_desc) {
     assman_init();
 
     // Engine context
-    EngineInternal* internal = wdl_arena_push_no_zero(persistent, sizeof(EngineInternal));
-    *internal = (EngineInternal) {
-        .frame_arenas = {frame_arenas[0], frame_arenas[1]},
+    engine = (Engine) {
+        .arenas = {
+            .persistent = persistent,
+            .frame = {frame_arenas[0], frame_arenas[1]},
+            .curr_frame = 0,
+        },
         .window = window,
-    };
-    EngineCtx ctx = {
-        .persistent_arena = persistent,
-        .frame_arena = frame_arenas[0],
         .renderer = renderer_init(persistent, 4096),
-        .user_ptr = NULL,
-
-        ._internal = internal,
     };
 
-    app_desc.startup(&ctx);
+    app_desc.startup();
 
     while (window_is_open(window)) {
         gfx_viewport(window_get_size(window));
 
-        ctx.window_size = window_get_size(window);
-        app_desc.update(&ctx);
+        app_desc.update();
 
         window_swap_buffers(window);
         window_poll_events(window);
 
         // Update frame arena
-        wdl_arena_clear(ctx.frame_arena);
-        internal->curr_frame = (internal->curr_frame + 1) % 2;
-        set_const(WDL_Arena*, ctx.frame_arena, internal->frame_arenas[internal->curr_frame]);
+        engine.arenas.curr_frame = (engine.arenas.curr_frame + 1) % 2;
+        wdl_arena_clear(get_frame_arena());
     }
 
-    app_desc.shutdown(&ctx);
+    app_desc.shutdown();
 
     assman_terminate();
 
@@ -101,16 +102,25 @@ i32 engine_run(ApplicationDesc app_desc) {
     return 0;
 }
 
-b8 key_down(const EngineCtx* ctx, Key key)     { return window_key_down(ctx->_internal->window, key); }
-b8 key_up(const EngineCtx* ctx, Key key)       { return window_key_up(ctx->_internal->window, key); }
-b8 key_pressed(const EngineCtx* ctx, Key key)  { return window_key_pressed(ctx->_internal->window, key); }
-b8 key_released(const EngineCtx* ctx, Key key) { return window_key_released(ctx->_internal->window, key); }
+// Getters
 
-b8 mouse_button_down(const EngineCtx* ctx, MouseButton button) { return window_mouse_button_down(ctx->_internal->window, button); }
-b8 mouse_button_up(const EngineCtx* ctx, MouseButton button) { return window_mouse_button_up(ctx->_internal->window, button); }
-b8 mouse_button_pressed(const EngineCtx* ctx, MouseButton button) { return window_mouse_button_pressed(ctx->_internal->window, button); }
-b8 mouse_button_released(const EngineCtx* ctx, MouseButton button) { return window_mouse_button_released(ctx->_internal->window, button); }
-WDL_Vec2 mouse_pos(const EngineCtx* ctx) { return window_mouse_pos(ctx->_internal->window); }
+WDL_Arena* get_presistent_arena(void) { return engine.arenas.persistent; }
+WDL_Arena* get_frame_arena(void) { return engine.arenas.frame[engine.arenas.curr_frame]; }
+Renderer* get_renderer(void) { return engine.renderer; }
+WDL_Ivec2 get_screen_size(void) { return window_get_size(engine.window); }
+
+// Input
+
+b8 key_down(Key key)     { return window_key_down(engine.window, key); }
+b8 key_up(Key key)       { return window_key_up(engine.window, key); }
+b8 key_pressed(Key key)  { return window_key_pressed(engine.window, key); }
+b8 key_released(Key key) { return window_key_released(engine.window, key); }
+
+b8 mouse_button_down(MouseButton button) { return window_mouse_button_down(engine.window, button); }
+b8 mouse_button_up(MouseButton button) { return window_mouse_button_up(engine.window, button); }
+b8 mouse_button_pressed(MouseButton button) { return window_mouse_button_pressed(engine.window, button); }
+b8 mouse_button_released(MouseButton button) { return window_mouse_button_released(engine.window, button); }
+WDL_Vec2 mouse_pos(void) { return window_mouse_pos(engine.window); }
 
 // -- Rendering ---------------------------------------------------------------
 

@@ -7,18 +7,6 @@
 
 typedef struct Renderer Renderer;
 
-typedef struct EngineInternal EngineInternal;
-typedef struct EngineCtx EngineCtx;
-struct EngineCtx {
-    WDL_Arena* const frame_arena;
-    WDL_Arena* const persistent_arena;
-    Renderer* const renderer;
-    WDL_Ivec2 window_size;
-    void* user_ptr;
-
-    EngineInternal* const _internal;
-};
-
 typedef struct ApplicationDesc ApplicationDesc;
 struct ApplicationDesc {
     struct {
@@ -28,23 +16,32 @@ struct ApplicationDesc {
         b8 vsync;
     } window;
 
-    void (*startup)(EngineCtx* ctx);
-    void (*update)(EngineCtx* ctx);
-    void (*shutdown)(EngineCtx* ctx);
+    void (*startup)(void);
+    void (*update)(void);
+    void (*shutdown)(void);
 };
 
 extern i32 engine_run(ApplicationDesc app_desc);
 
-extern b8 key_down(const EngineCtx* ctx, Key key);
-extern b8 key_up(const EngineCtx* ctx, Key key);
-extern b8 key_pressed(const EngineCtx* ctx, Key key);
-extern b8 key_released(const EngineCtx* ctx, Key key);
+// Getters
 
-extern b8 mouse_button_down(const EngineCtx* ctx, MouseButton button);
-extern b8 mouse_button_up(const EngineCtx* ctx, MouseButton button);
-extern b8 mouse_button_pressed(const EngineCtx* ctx, MouseButton button);
-extern b8 mouse_button_released(const EngineCtx* ctx, MouseButton button);
-extern WDL_Vec2 mouse_pos(const EngineCtx* ctx);
+extern WDL_Arena* get_presistent_arena(void);
+extern WDL_Arena* get_frame_arena(void);
+extern Renderer* get_renderer(void);
+extern WDL_Ivec2 get_screen_size(void);
+
+// Input
+
+extern b8 key_down(Key key);
+extern b8 key_up(Key key);
+extern b8 key_pressed(Key key);
+extern b8 key_released(Key key);
+
+extern b8 mouse_button_down(MouseButton button);
+extern b8 mouse_button_up(MouseButton button);
+extern b8 mouse_button_pressed(MouseButton button);
+extern b8 mouse_button_released(MouseButton button);
+extern WDL_Vec2 mouse_pos(void);
 
 // -- Rendering ---------------------------------------------------------------
 
