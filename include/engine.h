@@ -2,8 +2,21 @@
 #define ENGINE_H
 
 #include "waddle.h"
+#include "engine/assman.h"
 
+typedef struct Renderer Renderer;
+
+typedef struct EngineInternal EngineInternal;
 typedef struct EngineCtx EngineCtx;
+struct EngineCtx {
+    WDL_Arena* const frame_arena;
+    WDL_Arena* const persistent_arena;
+    Renderer* const renderer;
+    WDL_Ivec2 window_size;
+    void* user_ptr;
+
+    EngineInternal* const _internal;
+};
 
 typedef struct ApplicationDesc ApplicationDesc;
 struct ApplicationDesc {
@@ -21,10 +34,26 @@ struct ApplicationDesc {
 
 extern i32 engine_run(ApplicationDesc app_desc);
 
-extern WDL_Arena* get_persistent_arena(const EngineCtx* ctx);
-extern WDL_Arena* get_frame_arena(const EngineCtx* ctx);
+// -- Rendering ---------------------------------------------------------------
 
-extern void  set_user_ptr(EngineCtx* ctx, void* user_ptr);
-extern void* get_user_ptr(const EngineCtx* ctx);
+typedef struct Texture Texture;
+typedef struct Camera Camera;
+struct Camera {
+    WDL_Ivec2 screen_size;
+    WDL_Vec2 pos;
+    f32 zoom;
+    b8 invert_y;
+};
+
+extern WDL_Vec2 world_to_screen_space(WDL_Vec2 world, Camera cam);
+extern WDL_Vec2 screen_to_world_space(WDL_Vec2 screen, Camera cam);
+
+//
+// Renderer
+//
+
+extern void renderer_begin(Renderer* rend, Camera cam);
+extern void renderer_end(Renderer* rend);
+extern void renderer_draw_quad(Renderer* rend, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color);
 
 #endif // ENGINE_H

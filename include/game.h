@@ -22,7 +22,7 @@ struct Entity {
 
     // Rendering
     GfxTexture texture;
-    GfxColor color;
+    Color color;
     b8 use_atlas;
     WDL_Vec2 uvs[2];
 };

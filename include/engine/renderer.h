@@ -69,7 +69,7 @@ struct Quad {
     WDL_Vec2 pos;
     WDL_Vec2 size;
     f32 rotation;
-    GfxColor color;
+    Color color;
     GfxTexture texture;
     WDL_Vec2 pivot;
 };
@@ -108,7 +108,7 @@ extern void debug_ctx_reset(DebugCtx* ctx);
 extern void debug_draw_quad(Quad quad, Camera cam);
 extern void debug_draw_quad_outline(Quad quad, Camera cam);
 
-extern void debug_draw_line(WDL_Vec2 a, WDL_Vec2 b, GfxColor color, Camera cam);
-extern void debug_draw_line_angle(WDL_Vec2 pos, f32 angle, f32 length, GfxColor color, Camera cam);
+extern void debug_draw_line(WDL_Vec2 a, WDL_Vec2 b, Color color, Camera cam);
+extern void debug_draw_line_angle(WDL_Vec2 pos, f32 angle, f32 length, Color color, Camera cam);
 
 #endif // RENDERER_H

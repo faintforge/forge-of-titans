@@ -150,16 +150,16 @@ void gfx_termiante(void) {
 
 // -- Color --------------------------------------------------------------------
 
-GfxColor gfx_color_rgba_f(f32 r, f32 g, f32 b, f32 a) {
-    return (GfxColor) {r, g, b, a};
+Color color_rgba_f(f32 r, f32 g, f32 b, f32 a) {
+    return (Color) {r, g, b, a};
 }
 
-GfxColor gfx_color_rgba_i(u8 r, u8 g, u8 b, u8 a) {
-    return (GfxColor) {r/255.0f, g/255.0f, b/255.0f, a/255.0f};
+Color color_rgba_i(u8 r, u8 g, u8 b, u8 a) {
+    return (Color) {r/255.0f, g/255.0f, b/255.0f, a/255.0f};
 }
 
-GfxColor gfx_color_rgba_hex(u32 hex) {
-    return (GfxColor) {
+Color color_rgba_hex(u32 hex) {
+    return (Color) {
         .r = (f32) (hex >> 8 * 3 & 0xff) / 0xff,
         .g = (f32) (hex >> 8 * 2 & 0xff) / 0xff,
         .b = (f32) (hex >> 8 * 1 & 0xff) / 0xff,
@@ -167,16 +167,16 @@ GfxColor gfx_color_rgba_hex(u32 hex) {
     };
 }
 
-GfxColor gfx_color_rgb_f(f32 r, f32 g, f32 b) {
-    return (GfxColor) {r, g, b, 1.0f};
+Color color_rgb_f(f32 r, f32 g, f32 b) {
+    return (Color) {r, g, b, 1.0f};
 }
 
-GfxColor gfx_color_rgb_i(u8 r, u8 g, u8 b) {
-    return (GfxColor) {r/255.0f, g/255.0f, b/255.0f, 1.0f};
+Color color_rgb_i(u8 r, u8 g, u8 b) {
+    return (Color) {r/255.0f, g/255.0f, b/255.0f, 1.0f};
 }
 
-GfxColor gfx_color_rgb_hex(u32 hex) {
-    return (GfxColor) {
+Color color_rgb_hex(u32 hex) {
+    return (Color) {
         .r = (f32) (hex >> 8 * 2 & 0xff) / 0xff,
         .g = (f32) (hex >> 8 * 1 & 0xff) / 0xff,
         .b = (f32) (hex >> 8 * 0 & 0xff) / 0xff,
@@ -184,18 +184,18 @@ GfxColor gfx_color_rgb_hex(u32 hex) {
     };
 }
 
-GfxColor gfx_color_hsl(f32 hue, f32 saturation, f32 lightness) {
+Color color_hsl(f32 hue, f32 saturation, f32 lightness) {
     // https://en.wikipedia.org/wiki/HSL_and_HSV#HSL_to_RGB
-    GfxColor color = {0};
+    Color color = {0};
     f32 chroma = (1 - fabsf(2 * lightness - 1)) * saturation;
     f32 hue_prime = fabsf(fmodf(hue, 360.0f)) / 60.0f;
     f32 x = chroma * (1.0f - fabsf(fmodf(hue_prime, 2.0f) - 1.0f));
-    if (hue_prime < 1.0f) { color = (GfxColor) { chroma, x, 0.0f, 1.0f, }; }
-    else if (hue_prime < 2.0f) { color = (GfxColor) { x, chroma, 0.0f, 1.0f, }; }
-    else if (hue_prime < 3.0f) { color = (GfxColor) { 0.0f, chroma, x, 1.0f, }; }
-    else if (hue_prime < 4.0f) { color = (GfxColor) { 0.0f, x, chroma, 1.0f, }; }
-    else if (hue_prime < 5.0f) { color = (GfxColor) { x, 0.0f, chroma, 1.0f, }; }
-    else if (hue_prime < 6.0f) { color = (GfxColor) { chroma, 0.0f, x, 1.0f, }; }
+    if (hue_prime < 1.0f) { color = (Color) { chroma, x, 0.0f, 1.0f, }; }
+    else if (hue_prime < 2.0f) { color = (Color) { x, chroma, 0.0f, 1.0f, }; }
+    else if (hue_prime < 3.0f) { color = (Color) { 0.0f, chroma, x, 1.0f, }; }
+    else if (hue_prime < 4.0f) { color = (Color) { 0.0f, x, chroma, 1.0f, }; }
+    else if (hue_prime < 5.0f) { color = (Color) { x, 0.0f, chroma, 1.0f, }; }
+    else if (hue_prime < 6.0f) { color = (Color) { chroma, 0.0f, x, 1.0f, }; }
     f32 m = lightness-chroma / 2.0f;
     color.r += m;
     color.g += m;
@@ -203,18 +203,18 @@ GfxColor gfx_color_hsl(f32 hue, f32 saturation, f32 lightness) {
     return color;
 }
 
-GfxColor gfx_color_hsv(f32 hue, f32 saturation, f32 value) {
+Color color_hsv(f32 hue, f32 saturation, f32 value) {
     // https://en.wikipedia.org/wiki/HSL_and_HSV#HSV_to_RGB
-    GfxColor color = {0};
+    Color color = {0};
     f32 chroma = value * saturation;
     f32 hue_prime = fabsf(fmodf(hue, 360.0f)) / 60.0f;
     f32 x = chroma * (1.0f - fabsf(fmodf(hue_prime, 2.0f) - 1.0f));
-    if (hue_prime < 1.0f) { color = (GfxColor) { chroma, x, 0.0f, 1.0f, }; }
-    else if (hue_prime < 2.0f) { color = (GfxColor) { x, chroma, 0.0f, 1.0f, }; }
-    else if (hue_prime < 3.0f) { color = (GfxColor) { 0.0f, chroma, x, 1.0f, }; }
-    else if (hue_prime < 4.0f) { color = (GfxColor) { 0.0f, x, chroma, 1.0f, }; }
-    else if (hue_prime < 5.0f) { color = (GfxColor) { x, 0.0f, chroma, 1.0f, }; }
-    else if (hue_prime < 6.0f) { color = (GfxColor) { chroma, 0.0f, x, 1.0f, }; }
+    if (hue_prime < 1.0f) { color = (Color) { chroma, x, 0.0f, 1.0f, }; }
+    else if (hue_prime < 2.0f) { color = (Color) { x, chroma, 0.0f, 1.0f, }; }
+    else if (hue_prime < 3.0f) { color = (Color) { 0.0f, chroma, x, 1.0f, }; }
+    else if (hue_prime < 4.0f) { color = (Color) { 0.0f, x, chroma, 1.0f, }; }
+    else if (hue_prime < 5.0f) { color = (Color) { x, 0.0f, chroma, 1.0f, }; }
+    else if (hue_prime < 6.0f) { color = (Color) { chroma, 0.0f, x, 1.0f, }; }
     f32 m = value - chroma;
     color.r += m;
     color.g += m;
@@ -587,8 +587,8 @@ void gfx_framebuffer_unbind(void) {
 
 // -- Drawing ------------------------------------------------------------------
 
-void gfx_clear(GfxColor color) {
-    glClearColor(gfx_color_arg(color));
+void gfx_clear(Color color) {
+    glClearColor(color_arg(color));
     glClear(GL_COLOR_BUFFER_BIT);
 }
 

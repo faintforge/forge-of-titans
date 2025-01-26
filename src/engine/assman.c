@@ -1,6 +1,7 @@
 #include "engine/assman.h"
 #include "engine/graphics.h"
 #include "engine/font.h"
+#include "waddle.h"
 
 #include <string.h>
 
@@ -84,6 +85,7 @@ void assman_init(void) {
     wdl_assert(!assman.inited, "Asset manager already initialized.");
 
     WDL_Arena* arena = wdl_arena_create();
+    wdl_arena_tag(arena, wdl_str_lit("assets"));
     assman = (AssetManager) {
         .inited = true,
         .arena = arena,

@@ -151,7 +151,7 @@ void quadtree_atlas_debug_draw_helper(WDL_Ivec2 atlas_size, QuadtreeAtlasNode* n
     debug_draw_quad_outline((Quad) {
             .pos = pos,
             .size = size,
-            .color = gfx_color_rgb_hex(0x808080),
+            .color = color_rgb_hex(0x808080),
             .pivot = wdl_v2(-0.5f, 0.5f),
         }, cam);
 

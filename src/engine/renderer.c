@@ -90,7 +90,7 @@ typedef struct Vertex Vertex;
 struct Vertex {
     WDL_Vec2 pos;
     WDL_Vec2 uv;
-    GfxColor color;
+    Color color;
     f32 texture_index;
 };
 
@@ -349,13 +349,13 @@ void debug_draw_quad_outline(Quad quad, Camera cam) {
     debug_draw_line_angle(tr, quad.rotation - QUARTER_TURN, -quad.size.y, quad.color, cam);
 }
 
-void debug_draw_line(WDL_Vec2 a, WDL_Vec2 b, GfxColor color, Camera cam) {
+void debug_draw_line(WDL_Vec2 a, WDL_Vec2 b, Color color, Camera cam) {
     WDL_Vec2 diff = wdl_v2_sub(a, b);
     f32 angle = atan2f(diff.y, diff.x);
     debug_draw_line_angle(a, angle, wdl_v2_magnitude(diff), color, cam);
 }
 
-void debug_draw_line_angle(WDL_Vec2 pos, f32 angle, f32 length, GfxColor color, Camera cam) {
+void debug_draw_line_angle(WDL_Vec2 pos, f32 angle, f32 length, Color color, Camera cam) {
     Quad quad = {
         .pos = pos,
         .color = color,
