@@ -213,6 +213,11 @@ static Renderer* renderer_init(WDL_Arena* arena, u32 max_quad_count) {
     WDL_Str vert_src = read_file(scratch.arena, wdl_str_lit("assets/shaders/batch.vert.glsl"));
     WDL_Str frag_src = read_file(scratch.arena, wdl_str_lit("assets/shaders/batch.frag.glsl"));
     GfxShader shader = gfx_shader_new(vert_src, frag_src);
+    i32 samplers[RENDERER_MAX_TEXTURE_COUNT];
+    for (u32 i = 0; i < RENDERER_MAX_TEXTURE_COUNT; i++) {
+        samplers[i] = i;
+    }
+    gfx_shader_uniform_i32_arr(shader, wdl_str_lit("textures"), samplers, RENDERER_MAX_TEXTURE_COUNT);
     wdl_scratch_end(scratch);
 
     // Renderer
@@ -278,19 +283,23 @@ void renderer_end(Renderer* rend) {
 }
 
 void renderer_draw_quad(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color) {
+    renderer_draw_quad_textured(rend, pivot, pos, size, rot, color, GFX_TEXTURE_NULL);
+}
+
+void renderer_draw_quad_textured(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color, GfxTexture texture) {
     b8 texture_found = false;
     f32 texture_index = 0;
-    // if (gfx_texture_is_null(quad.texture)) {
-    //     texture_found = true;
-    // } else {
-    //     for (u8 i = 1; i < br->curr_texture; i++) {
-    //         if (br->textures[i].handle == quad.texture.handle) {
-    //             texture_index = i;
-    //             texture_found = true;
-    //             break;
-    //         }
-    //     }
-    // }
+    if (gfx_texture_is_null(texture)) {
+        texture_found = true;
+    } else {
+        for (u8 i = 1; i < rend->curr_texture; i++) {
+            if (rend->textures[i].handle == texture.handle) {
+                texture_index = i;
+                texture_found = true;
+                break;
+            }
+        }
+    }
 
     if (rend->curr_quad == rend->max_quad_count ||
             (rend->curr_texture == RENDERER_MAX_TEXTURE_COUNT && !texture_found)) {
@@ -298,10 +307,10 @@ void renderer_draw_quad(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 s
         renderer_begin(rend, rend->cam);
     }
 
-    // if (!texture_found) {
-    //     texture_index = rend->curr_texture;
-    //     rend->textures[rend->curr_texture++] = quad.texture;
-    // }
+    if (!texture_found) {
+        texture_index = rend->curr_texture;
+        rend->textures[rend->curr_texture++] = texture;
+    }
 
     const WDL_Vec2 vert_pos[4] = {
         wdl_v2(-0.5f, -0.5f),

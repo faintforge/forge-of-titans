@@ -48,7 +48,6 @@ extern WDL_Vec2 mouse_pos(const EngineCtx* ctx);
 
 // -- Rendering ---------------------------------------------------------------
 
-typedef struct Texture Texture;
 typedef struct Camera Camera;
 struct Camera {
     WDL_Ivec2 screen_size;
@@ -67,5 +66,6 @@ extern WDL_Vec2 screen_to_world_space(WDL_Vec2 screen, Camera cam);
 extern void renderer_begin(Renderer* rend, Camera cam);
 extern void renderer_end(Renderer* rend);
 extern void renderer_draw_quad(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color);
+extern void renderer_draw_quad_textured(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color, GfxTexture texture);
 
 #endif // ENGINE_H

@@ -20,7 +20,7 @@ struct Entity {
 
     // Rendering
     b8 renderable;
-    Texture* texture;
+    GfxTexture texture;
     Color color;
 
     // Physics
@@ -40,13 +40,26 @@ void app_startup(EngineCtx* ctx) {
     Game* game = wdl_arena_push(persistent, sizeof(Game));
     ctx->user_ptr = game;
 
+    //
     // Assets
+    //
+
+    // Textures
     asset_load((AssetDesc) {
             .name = wdl_str_lit("player"),
             .filepath = wdl_str_lit("assets/textures/player.png"),
             .texture_sampler = GFX_TEXTURE_SAMPLER_NEAREST,
             .type = ASSET_TYPE_TEXTURE,
         });
+
+    asset_load((AssetDesc) {
+            .name = wdl_str_lit("sky"),
+            .filepath = wdl_str_lit("assets/textures/sky_bg.png"),
+            .texture_sampler = GFX_TEXTURE_SAMPLER_NEAREST,
+            .type = ASSET_TYPE_TEXTURE,
+        });
+
+    // Fonts
     asset_load((AssetDesc) {
             .name = wdl_str_lit("tiny5"),
             .filepath = wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"),
@@ -55,7 +68,7 @@ void app_startup(EngineCtx* ctx) {
         });
 
     game->cam = (Camera) {
-        .zoom = 24.0f,
+        .zoom = 32.0f,
         .pos = wdl_v2(0.0f, 0.0f),
         .invert_y = false,
     };
@@ -71,7 +84,7 @@ void app_startup(EngineCtx* ctx) {
         .pivot = wdl_v2(0.0f, -1.0f),
 
         .renderable = true,
-        .texture = asset_get(wdl_str_lit("player"), ASSET_TYPE_TEXTURE, Texture*),
+        .texture = asset_get(wdl_str_lit("player"), ASSET_TYPE_TEXTURE, GfxTexture),
         .color = COLOR_WHITE,
     };
 }
@@ -120,7 +133,7 @@ void app_update(EngineCtx* ctx) {
         const f32 acc = 80.0f;
         const f32 turn_boost = 150.0f;
         const f32 dec = 100.0f;
-        const f32 jump_height = 25.0f;
+        const f32 jump_height = 20.0f;
 
         // Input
         f32 hori = 0.0f;
@@ -160,6 +173,11 @@ void app_update(EngineCtx* ctx) {
         // Move
         ent->pos = wdl_v2_add(ent->pos, wdl_v2_muls(ent->vel, game->dt));
 
+        i8 facing = sign(ent->vel.x);
+        if (facing != 0) {
+            ent->size.x = facing;
+        }
+
         // Ground checking
         if (ent->pos.y < 0.0f) {
             ent->pos.y = 0.0f;
@@ -184,16 +202,16 @@ void app_update(EngineCtx* ctx) {
 
     f32 aspect = (f32) game->cam.screen_size.x / (f32) game->cam.screen_size.y;
     WDL_Vec2 full_screen_quad_size = wdl_v2(aspect * game->cam.zoom, game->cam.zoom + 2.0f);
-    renderer_draw_quad(renderer, wdl_v2s(0.0f), game->cam.pos, full_screen_quad_size, 0.0, COLOR_BLACK);
+    renderer_draw_quad_textured(renderer, wdl_v2s(0.0f), game->cam.pos, full_screen_quad_size, 0.0, COLOR_WHITE, asset_get(wdl_str_lit("sky"), ASSET_TYPE_TEXTURE, GfxTexture));
 
     const WDL_Ivec2 grid = wdl_iv2(100, 4);
     for (i32 y = 0; y < grid.y; y++) {
         for (i32 x = 0; x < grid.x; x++) {
             Color color;
             if ((x + y) % 2 == 0) {
-                color = color_rgb_hex(0x211818);
+                color = COLOR_WHITE;
             } else {
-                color = color_rgb_hex(0x182118);
+                color = COLOR_BLACK;
             }
             f32 x0 = x - grid.x / 2.0f + 0.5f;
             f32 y0 = -y;
@@ -203,10 +221,10 @@ void app_update(EngineCtx* ctx) {
 
     for (u32 i = 0; i < wdl_arrlen(game->entities); i++) {
         Entity* ent = &game->entities[i];
-        if (!ent->alive) {
+        if (!ent->alive || !ent->renderable) {
             continue;
         }
-        renderer_draw_quad(renderer, ent->pivot, ent->pos, ent->size, ent->rot, ent->color);
+        renderer_draw_quad_textured(renderer, ent->pivot, ent->pos, ent->size, ent->rot, ent->color, ent->texture);
     }
 
     renderer_end(renderer);
