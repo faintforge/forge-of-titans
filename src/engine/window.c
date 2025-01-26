@@ -19,6 +19,10 @@ struct Window {
     ResizeCallback resize_cb;
 
     Button keyboard[GLFW_KEY_LAST];
+    struct {
+        WDL_Vec2 pos;
+        Button button[MOUSE_BUTTON_COUNT];
+    } mouse;
 };
 
 static void close_cb(GLFWwindow* handle) {
@@ -46,6 +50,28 @@ static void key_cb(GLFWwindow* handle, i32 key, i32 scancode, i32 action, i32 mo
         case GLFW_RELEASE:
             window->keyboard[key].down = false;
             window->keyboard[key].first = true;
+            break;
+        default:
+            break;
+    }
+}
+
+static void mouse_pos_cb(GLFWwindow* handle, f64 xpos, f64 ypos) {
+    Window* window = glfwGetWindowUserPointer(handle);
+    window->mouse.pos = wdl_v2(xpos, ypos);
+}
+
+static void mouse_button_cb(GLFWwindow* handle, i32 button, i32 action, i32 mods) {
+    (void) mods;
+    Window* window = glfwGetWindowUserPointer(handle);
+    switch (action) {
+        case GLFW_PRESS:
+            window->mouse.button[button].down = true;
+            window->mouse.button[button].first = true;
+            break;
+        case GLFW_RELEASE:
+            window->mouse.button[button].down = false;
+            window->mouse.button[button].first = true;
             break;
         default:
             break;
@@ -82,6 +108,8 @@ Window* window_create(WDL_Arena* arena, WindowDesc desc) {
     glfwSetWindowCloseCallback(window->handle, close_cb);
     glfwSetFramebufferSizeCallback(window->handle, internal_resize_cb);
     glfwSetKeyCallback(window->handle, key_cb);
+    glfwSetCursorPosCallback(window->handle, mouse_pos_cb);
+    glfwSetMouseButtonCallback(window->handle, mouse_button_cb);
 
     glfwMakeContextCurrent(window->handle);
     glfwSwapInterval(desc.vsync);
@@ -98,6 +126,9 @@ void window_destroy(Window* window) {
 void window_poll_events(Window* window) {
     for (u32 i = 0; i < wdl_arrlen(window->keyboard); i++) {
         window->keyboard[i].first = false;
+    }
+    for (u32 i = 0; i < wdl_arrlen(window->mouse.button); i++) {
+        window->mouse.button[i].first = false;
     }
     glfwPollEvents();
 }
@@ -136,4 +167,24 @@ b8 window_key_pressed(const Window* window, Key key) {
 
 b8 window_key_released(const Window* window, Key key) {
     return !window->keyboard[key].down && window->keyboard[key].first;
+}
+
+WDL_Vec2 window_mouse_pos(const Window* window) {
+    return window->mouse.pos;
+}
+
+b8 window_mouse_button_down(const Window* window, MouseButton button) {
+    return window->mouse.button[button].down;
+}
+
+b8 window_mouse_button_up(const Window* window, MouseButton button) {
+    return !window->mouse.button[button].down;
+}
+
+b8 window_mouse_button_pressed(const Window* window, MouseButton button) {
+    return window->mouse.button[button].down && window->mouse.button[button].first;
+}
+
+b8 window_mouse_button_released(const Window* window, MouseButton button) {
+    return !window->mouse.button[button].down && window->mouse.button[button].first;
 }

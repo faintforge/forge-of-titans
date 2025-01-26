@@ -71,6 +71,16 @@ void app_update(EngineCtx* ctx) {
         fps_timer = 0.0f;
     }
 
+    if (mouse_button_pressed(ctx, MOUSE_BUTTON_LEFT)) {
+        wdl_debug("Left");
+    }
+    if (mouse_button_pressed(ctx, MOUSE_BUTTON_RIGHT)) {
+        wdl_debug("Right");
+    }
+    if (mouse_button_pressed(ctx, MOUSE_BUTTON_MIDDLE)) {
+        wdl_debug("Middle");
+    }
+
     // Rendering
     Camera cam = {
         .zoom = 16.0f,

@@ -40,6 +40,12 @@ extern b8 key_up(const EngineCtx* ctx, Key key);
 extern b8 key_pressed(const EngineCtx* ctx, Key key);
 extern b8 key_released(const EngineCtx* ctx, Key key);
 
+extern b8 mouse_button_down(const EngineCtx* ctx, MouseButton button);
+extern b8 mouse_button_up(const EngineCtx* ctx, MouseButton button);
+extern b8 mouse_button_pressed(const EngineCtx* ctx, MouseButton button);
+extern b8 mouse_button_released(const EngineCtx* ctx, MouseButton button);
+extern WDL_Vec2 mouse_pos(const EngineCtx* ctx);
+
 // -- Rendering ---------------------------------------------------------------
 
 typedef struct Texture Texture;

@@ -147,12 +147,27 @@ typedef enum Key {
     KEY_RIGHT_ALT        = 346,
     KEY_RIGHT_SUPER      = 347,
     KEY_MENU             = 348,
-    KEY_LAST             = KEY_MENU,
+
+    KEY_COUNT,
 } Key;
 
 extern b8 window_key_down(const Window* window, Key key);
 extern b8 window_key_up(const Window* window, Key key);
 extern b8 window_key_pressed(const Window* window, Key key);
 extern b8 window_key_released(const Window* window, Key key);
+
+typedef enum MouseButton {
+    MOUSE_BUTTON_LEFT,
+    MOUSE_BUTTON_RIGHT,
+    MOUSE_BUTTON_MIDDLE,
+
+    MOUSE_BUTTON_COUNT,
+} MouseButton;
+
+extern WDL_Vec2 window_mouse_pos(const Window* window);
+extern b8       window_mouse_button_down(const Window* window, MouseButton button);
+extern b8       window_mouse_button_up(const Window* window, MouseButton button);
+extern b8       window_mouse_button_pressed(const Window* window, MouseButton button);
+extern b8       window_mouse_button_released(const Window* window, MouseButton button);
 
 #endif // WINDOW_H

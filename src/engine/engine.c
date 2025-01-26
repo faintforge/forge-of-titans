@@ -104,6 +104,12 @@ b8 key_up(const EngineCtx* ctx, Key key)       { return window_key_up(ctx->_inte
 b8 key_pressed(const EngineCtx* ctx, Key key)  { return window_key_pressed(ctx->_internal->window, key); }
 b8 key_released(const EngineCtx* ctx, Key key) { return window_key_released(ctx->_internal->window, key); }
 
+b8 mouse_button_down(const EngineCtx* ctx, MouseButton button) { return window_mouse_button_down(ctx->_internal->window, button); }
+b8 mouse_button_up(const EngineCtx* ctx, MouseButton button) { return window_mouse_button_up(ctx->_internal->window, button); }
+b8 mouse_button_pressed(const EngineCtx* ctx, MouseButton button) { return window_mouse_button_pressed(ctx->_internal->window, button); }
+b8 mouse_button_released(const EngineCtx* ctx, MouseButton button) { return window_mouse_button_released(ctx->_internal->window, button); }
+WDL_Vec2 mouse_pos(const EngineCtx* ctx) { return window_mouse_pos(ctx->_internal->window); }
+
 // -- Rendering ---------------------------------------------------------------
 
 static WDL_Mat4 camera_proj(Camera cam) {
