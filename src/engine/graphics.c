@@ -100,6 +100,7 @@ static GraphicsState state = {0};
 
 b8 gfx_init(void) {
     WDL_Arena* arena = wdl_arena_create();
+    wdl_arena_tag(arena, wdl_str_lit("graphics"));
     state = (GraphicsState) {
         .arena = arena,
         .lib_gl = wdl_lib_load(arena, "libGL.so"),

@@ -49,6 +49,9 @@ Window* window_create(WDL_Arena* arena, WindowDesc desc) {
         .resize_cb = desc.resize_cb,
         .user_data = desc.user_data,
     };
+    if (window->handle == NULL) {
+        return NULL;
+    }
     glfwSetWindowUserPointer(window->handle, window);
     glfwSetWindowCloseCallback(window->handle, close_cb);
     glfwSetFramebufferSizeCallback(window->handle, internal_resize_cb);
