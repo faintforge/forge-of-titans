@@ -66,6 +66,6 @@ extern WDL_Vec2 screen_to_world_space(WDL_Vec2 screen, Camera cam);
 
 extern void renderer_begin(Renderer* rend, Camera cam);
 extern void renderer_end(Renderer* rend);
-extern void renderer_draw_quad(Renderer* rend, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color);
+extern void renderer_draw_quad(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color);
 
 #endif // ENGINE_H

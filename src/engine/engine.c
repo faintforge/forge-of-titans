@@ -71,6 +71,8 @@ i32 engine_run(ApplicationDesc app_desc) {
     app_desc.startup(&ctx);
 
     while (window_is_open(window)) {
+        gfx_viewport(window_get_size(window));
+
         ctx.window_size = window_get_size(window);
         app_desc.update(&ctx);
 
@@ -275,7 +277,7 @@ void renderer_end(Renderer* rend) {
     gfx_draw_indexed(rend->vertex_array, rend->curr_quad * 6, 0);
 }
 
-void renderer_draw_quad(Renderer* rend, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color) {
+void renderer_draw_quad(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color) {
     b8 texture_found = false;
     f32 texture_index = 0;
     // if (gfx_texture_is_null(quad.texture)) {
@@ -321,8 +323,10 @@ void renderer_draw_quad(Renderer* rend, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Co
         pos.y = -pos.y;
     }
 
+    pivot = wdl_v2_divs(pivot, 2.0f);
     for (u8 i = 0; i < 4; i++) {
         WDL_Vec2 vpos = vert_pos[i];
+        vpos = wdl_v2_sub(vpos, pivot);
         vpos = wdl_v2_mul(vpos, size);
         vpos = wdl_v2(vpos.x * cosf(rot) - vpos.y * sinf(rot),
             vpos.x * sinf(rot) + vpos.y * cosf(rot));
