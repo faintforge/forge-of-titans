@@ -75,7 +75,7 @@ i32 engine_run(ApplicationDesc app_desc) {
         app_desc.update(&ctx);
 
         window_swap_buffers(window);
-        window_poll_events();
+        window_poll_events(window);
 
         // Update frame arena
         wdl_arena_clear(ctx.frame_arena);
@@ -84,7 +84,6 @@ i32 engine_run(ApplicationDesc app_desc) {
     }
 
     app_desc.shutdown(&ctx);
-    wdl_debug("Done with app shutdown!");
 
     assman_terminate();
 
@@ -99,6 +98,11 @@ i32 engine_run(ApplicationDesc app_desc) {
 
     return 0;
 }
+
+b8 key_down(const EngineCtx* ctx, Key key)     { return window_key_down(ctx->_internal->window, key); }
+b8 key_up(const EngineCtx* ctx, Key key)       { return window_key_up(ctx->_internal->window, key); }
+b8 key_pressed(const EngineCtx* ctx, Key key)  { return window_key_pressed(ctx->_internal->window, key); }
+b8 key_released(const EngineCtx* ctx, Key key) { return window_key_released(ctx->_internal->window, key); }
 
 // -- Rendering ---------------------------------------------------------------
 

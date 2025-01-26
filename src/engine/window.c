@@ -3,6 +3,12 @@
 
 #include <GLFW/glfw3.h>
 
+typedef struct Button Button;
+struct Button {
+    b8 down;
+    b8 first;
+};
+
 struct Window {
     GLFWwindow* handle;
     b8 is_open;
@@ -11,6 +17,8 @@ struct Window {
     void* user_data;
 
     ResizeCallback resize_cb;
+
+    Button keyboard[GLFW_KEY_LAST];
 };
 
 static void close_cb(GLFWwindow* handle) {
@@ -23,6 +31,24 @@ static void internal_resize_cb(GLFWwindow* handle, i32 width, i32 height) {
     window->size = wdl_iv2(width, height);
     if (window->resize_cb != NULL) {
         window->resize_cb(window, window->size);
+    }
+}
+
+static void key_cb(GLFWwindow* handle, i32 key, i32 scancode, i32 action, i32 mods) {
+    (void) scancode;
+    (void) mods;
+    Window* window = glfwGetWindowUserPointer(handle);
+    switch (action) {
+        case GLFW_PRESS:
+            window->keyboard[key].down = true;
+            window->keyboard[key].first = true;
+            break;
+        case GLFW_RELEASE:
+            window->keyboard[key].down = false;
+            window->keyboard[key].first = true;
+            break;
+        default:
+            break;
     }
 }
 
@@ -55,6 +81,7 @@ Window* window_create(WDL_Arena* arena, WindowDesc desc) {
     glfwSetWindowUserPointer(window->handle, window);
     glfwSetWindowCloseCallback(window->handle, close_cb);
     glfwSetFramebufferSizeCallback(window->handle, internal_resize_cb);
+    glfwSetKeyCallback(window->handle, key_cb);
 
     glfwMakeContextCurrent(window->handle);
     glfwSwapInterval(desc.vsync);
@@ -68,7 +95,10 @@ void window_destroy(Window* window) {
     glfwTerminate();
 }
 
-void window_poll_events(void) {
+void window_poll_events(Window* window) {
+    for (u32 i = 0; i < wdl_arrlen(window->keyboard); i++) {
+        window->keyboard[i].first = false;
+    }
     glfwPollEvents();
 }
 
@@ -90,4 +120,20 @@ WDL_Ivec2 window_get_size(const Window* window) {
 
 void* window_get_user_data(const Window* window) {
     return window->user_data;
+}
+
+b8 window_key_down(const Window* window, Key key) {
+    return window->keyboard[key].down;
+}
+
+b8 window_key_up(const Window* window, Key key) {
+    return !window->keyboard[key].down;
+}
+
+b8 window_key_pressed(const Window* window, Key key) {
+    return window->keyboard[key].down && window->keyboard[key].first;
+}
+
+b8 window_key_released(const Window* window, Key key) {
+    return !window->keyboard[key].down && window->keyboard[key].first;
 }

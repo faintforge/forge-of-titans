@@ -2,7 +2,8 @@
 #define ENGINE_H
 
 #include "waddle.h"
-#include "engine/assman.h"
+#include "engine/window.h"
+#include "engine/graphics.h"
 
 typedef struct Renderer Renderer;
 
@@ -33,6 +34,11 @@ struct ApplicationDesc {
 };
 
 extern i32 engine_run(ApplicationDesc app_desc);
+
+extern b8 key_down(const EngineCtx* ctx, Key key);
+extern b8 key_up(const EngineCtx* ctx, Key key);
+extern b8 key_pressed(const EngineCtx* ctx, Key key);
+extern b8 key_released(const EngineCtx* ctx, Key key);
 
 // -- Rendering ---------------------------------------------------------------
 
