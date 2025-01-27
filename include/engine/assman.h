@@ -3,33 +3,15 @@
 
 #include "waddle.h"
 #include "graphics.h"
-
-typedef enum AssetType {
-    ASSET_TYPE_TEXTURE,
-    ASSET_TYPE_FONT,
-
-    ASSET_TYPE_COUNT,
-} AssetType;
-
-typedef struct AssetDesc AssetDesc;
-struct AssetDesc {
-    WDL_Str name;
-    WDL_Str filepath;
-    AssetType type;
-
-    GfxTextureSampler texture_sampler;
-};
+#include "font.h"
 
 extern void assman_init(void);
 extern void assman_terminate(void);
 
-extern void asset_load(AssetDesc desc);
-#define asset_get(NAME, TYPE, RETURN_TYPE) ({ \
-        RETURN_TYPE result; \
-        _asset_get_impl((NAME), (TYPE), &result); \
-        result; \
-    })
+extern GfxTexture asset_load_texture(WDL_Str name, WDL_Str filepath, GfxTextureSampler sampler);
+extern Font*      asset_load_font(WDL_Str name, WDL_Str filepath);
 
-extern void _asset_get_impl(WDL_Str name, AssetType type, void* output);
+extern GfxTexture asset_get_texture(WDL_Str name);
+extern Font*      asset_get_font(WDL_Str name);
 
 #endif // ASSMAN_H

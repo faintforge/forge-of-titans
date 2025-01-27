@@ -380,6 +380,15 @@ void renderer_draw_quad_textured(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, W
     renderer_draw_quad_textured_uvs(rend, pivot, pos, size, rot, color, texture, (WDL_Vec2[2]) {wdl_v2s(0.0f), wdl_v2s(1.0f)});
 }
 
+void renderer_draw_sprite(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color, Sprite sprite) {
+    WDL_Vec2 sheet_size = wdl_iv2_to_v2(gfx_texture_get_size(sprite.sheet));
+    WDL_Vec2 bl = wdl_iv2_to_v2(sprite.pos);
+    bl = wdl_v2_div(bl, sheet_size);
+    WDL_Vec2 tl = wdl_iv2_to_v2(wdl_iv2_add(sprite.pos, sprite.size));
+    tl = wdl_v2_div(tl, sheet_size);
+    renderer_draw_quad_textured_uvs(rend, pivot, pos, size, rot, color, sprite.sheet, (WDL_Vec2[2]) {bl, tl});
+}
+
 void renderer_draw_text(Renderer* rend, WDL_Str text, Font* font, WDL_Vec2 pivot, WDL_Vec2 pos, Color color) {
     Camera cam = rend->cam;
     f32 aspect = (f32) cam.screen_size.x / (f32) cam.screen_size.y;

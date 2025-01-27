@@ -44,6 +44,13 @@ extern WDL_Vec2 mouse_pos(void);
 
 // -- Rendering ---------------------------------------------------------------
 
+typedef struct Sprite Sprite;
+struct Sprite {
+    GfxTexture sheet;
+    WDL_Ivec2 pos;
+    WDL_Ivec2 size;
+};
+
 typedef struct Camera Camera;
 struct Camera {
     WDL_Ivec2 screen_size;
@@ -64,6 +71,7 @@ extern void renderer_end(Renderer* rend);
 extern void renderer_draw_quad(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color);
 extern void renderer_draw_quad_textured(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color, GfxTexture texture);
 extern void renderer_draw_quad_textured_uvs(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color, GfxTexture texture, WDL_Vec2 uvs[2]);
+extern void renderer_draw_sprite(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color, Sprite sprite);
 extern void renderer_draw_text(Renderer* rend, WDL_Str text, Font* font, WDL_Vec2 pivot, WDL_Vec2 pos, Color color);
 
 #endif // ENGINE_H

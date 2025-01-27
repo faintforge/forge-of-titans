@@ -3,7 +3,6 @@
 #include "engine/font.h"
 #include "engine/graphics.h"
 #include "waddle.h"
-#include <threads.h>
 
 typedef enum EntityType {
     ENTITY_NULL,
@@ -118,36 +117,14 @@ void app_startup(void) {
     //
 
     // Textures
-    asset_load((AssetDesc) {
-            .name = wdl_str_lit("player"),
-            .filepath = wdl_str_lit("assets/textures/blacksmith.png"),
-            .texture_sampler = GFX_TEXTURE_SAMPLER_LINEAR,
-            .type = ASSET_TYPE_TEXTURE,
-        });
-
-    asset_load((AssetDesc) {
-            .name = wdl_str_lit("sky"),
-            .filepath = wdl_str_lit("assets/textures/sky_bg.png"),
-            .texture_sampler = GFX_TEXTURE_SAMPLER_LINEAR,
-            .type = ASSET_TYPE_TEXTURE,
-        });
+    asset_load_texture(wdl_str_lit("player"), wdl_str_lit("assets/textures/blacksmith.png"), GFX_TEXTURE_SAMPLER_LINEAR);
+    asset_load_texture(wdl_str_lit("sky"), wdl_str_lit("assets/textures/sky_bg.png"), GFX_TEXTURE_SAMPLER_LINEAR);
+    asset_load_texture(wdl_str_lit("dirt"), wdl_str_lit("assets/textures/dirt_tile.png"), GFX_TEXTURE_SAMPLER_LINEAR);
 
     // Fonts
-    asset_load((AssetDesc) {
-            .name = wdl_str_lit("tiny5"),
-            .filepath = wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"),
-            .type = ASSET_TYPE_FONT,
-        });
-    asset_load((AssetDesc) {
-            .name = wdl_str_lit("spline-sans"),
-            .filepath = wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"),
-            .type = ASSET_TYPE_FONT,
-        });
-    asset_load((AssetDesc) {
-            .name = wdl_str_lit("roboto"),
-            .filepath = wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"),
-            .type = ASSET_TYPE_FONT,
-        });
+    asset_load_font(wdl_str_lit("tiny5"), wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"));
+    asset_load_font(wdl_str_lit("spline-sans"), wdl_str_lit("assets/fonts/Spline_Sans/static/SplineSans-Regular.ttf"));
+    asset_load_font(wdl_str_lit("roboto"), wdl_str_lit("assets/fonts/Roboto/Roboto-Regular.ttf"));
 
     // Player
     Entity* player = entity_spawn();
@@ -157,15 +134,15 @@ void app_startup(void) {
         .pos = wdl_v2(0.0f, 0.0f),
         .size = wdl_v2(2.0f, 2.0f),
         .rot = 0.0f,
-        .pivot = wdl_v2(0.0f, -1.0f),
+        .pivot = wdl_v2(0.0f, 0.0f),
 
         .renderable = true,
-        .texture = asset_get(wdl_str_lit("player"), ASSET_TYPE_TEXTURE, GfxTexture),
+        .texture = asset_get_texture(wdl_str_lit("player")),
         .color = COLOR_WHITE,
     };
 
-    Entity* enemy = entity_spawn();
-    enemy->renderable = true;
+    // Entity* enemy = entity_spawn();
+    // enemy->renderable = true;
 }
 
 #define sign(V) ((V) > 0 ? 1 : (V) < 0 ? -1 : 0)
@@ -264,9 +241,9 @@ void app_update(void) {
         }
 
         // Camera follow
-        // game.cam.pos.x = lerp(game.cam.pos.x, ent->pos.x, game.dt * 4.0f);
-        // game.cam.pos.y = lerp(game.cam.pos.y, ent->pos.y, game.dt * 4.0f);
-        game.cam.pos = ent->pos;
+        game.cam.pos.x = lerp(game.cam.pos.x, ent->pos.x, game.dt * 4.0f);
+        game.cam.pos.y = lerp(game.cam.pos.y, ent->pos.y, game.dt * 4.0f);
+        // game.cam.pos = ent->pos;
     }
 
 
@@ -284,25 +261,38 @@ void app_update(void) {
 
     f32 aspect = (f32) game.cam.screen_size.x / (f32) game.cam.screen_size.y;
     WDL_Vec2 full_screen_quad_size = wdl_v2(aspect * game.cam.zoom, game.cam.zoom);
-    renderer_draw_quad_textured(renderer, wdl_v2s(0.0f), game.cam.pos, full_screen_quad_size, 0.0, COLOR_WHITE, asset_get(wdl_str_lit("sky"), ASSET_TYPE_TEXTURE, GfxTexture));
+    renderer_draw_quad_textured(renderer, wdl_v2s(0.0f), game.cam.pos, full_screen_quad_size, 0.0, COLOR_WHITE, asset_get_texture(wdl_str_lit("sky")));
 
-    // const WDL_Ivec2 grid = wdl_iv2(100, 4);
-    // for (i32 y = 0; y < grid.y; y++) {
-    //     for (i32 x = 0; x < grid.x; x++) {
-    //         Color color;
-    //         if ((x + y) % 2 == 0) {
-    //             color = COLOR_WHITE;
-    //         } else {
-    //             color = COLOR_BLACK;
-    //         }
-    //         f32 x0 = x - grid.x / 2.0f + 0.5f;
-    //         f32 y0 = -y;
-    //         renderer_draw_quad(renderer, wdl_v2(0.0f, 1.0f), wdl_v2(x0, y0), wdl_v2s(1.0f), 0.0f, color);
-    //     }
-    // }
+    {
+        Sprite top = {
+            .sheet = asset_get_texture(wdl_str_lit("dirt")),
+            .pos = wdl_iv2(8, 0),
+            .size = wdl_iv2(8, 8),
+        };
+        for (u32 x = 0; x < 4; x++) {
+            renderer_draw_sprite(renderer, wdl_v2(0.0f, 0.0f), wdl_v2(x, -1.5f), wdl_v2s(1.0f), 0.0f, COLOR_WHITE, top);
+        }
 
-    Font* font = asset_get(wdl_str_lit("spline-sans"), ASSET_TYPE_FONT, Font*);
-    font_set_size(font, 24.0f);
+        Sprite middle = {
+            .sheet = asset_get_texture(wdl_str_lit("dirt")),
+            .pos = wdl_iv2(8, 8),
+            .size = wdl_iv2(8, 8),
+        };
+        for (u32 x = 0; x < 4; x++) {
+            renderer_draw_sprite(renderer, wdl_v2(0.0f, 0.0f), wdl_v2(x, -2.5f), wdl_v2s(1.0f), 0.0f, COLOR_WHITE, middle);
+        }
+
+        Sprite bottom = {
+            .sheet = asset_get_texture(wdl_str_lit("dirt")),
+            .pos = wdl_iv2(8, 16),
+            .size = wdl_iv2(8, 8),
+        };
+        for (u32 x = 0; x < 4; x++) {
+            renderer_draw_sprite(renderer, wdl_v2(0.0f, 0.0f), wdl_v2(x, -3.5f), wdl_v2s(1.0f), 0.0f, COLOR_WHITE, bottom);
+        }
+    }
+
+    Font* font = asset_get_font(wdl_str_lit("tiny5"));
     iter_alive_entities {
         if (!ent->renderable) {
             continue;
@@ -313,6 +303,7 @@ void app_update(void) {
             WDL_Vec2 pos = ent->pos;
             pos.y += ent->size.y;
             pos.y += 0.2f;
+            font_set_size(font, 16.0f);
             renderer_draw_text(renderer, wdl_str_lit("Player"), font, wdl_v2(0.0f, -1.0f), pos, COLOR_WHITE);
         }
     };
