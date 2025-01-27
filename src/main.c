@@ -2,16 +2,15 @@
 #include "engine/assman.h"
 #include "engine/graphics.h"
 #include "waddle.h"
+#include <threads.h>
 
 typedef enum EntityType {
+    ENTITY_NULL,
     ENTITY_PLAYER,
 } EntityType;
 
 typedef struct Entity Entity;
 struct Entity {
-    EntityType type;
-    b8 alive;
-
     // Transform
     WDL_Vec2 pos;
     WDL_Vec2 size;
@@ -26,18 +25,93 @@ struct Entity {
     // Physics
     WDL_Vec2 vel;
     b8 grounded;
+
+    // Management
+    EntityType type;
+    Entity* next;
+    Entity* prev;
 };
+
+const Entity ENTITY_DEFAULT = {
+    .pos = {0.0f, 0.0f},
+    .size = {1.0f, 1.0f},
+    .rot = 0.0f,
+    .pivot = {0.0f, 0.0f},
+
+    .renderable = false,
+    .texture = GFX_TEXTURE_NULL,
+    .color = COLOR_WHITE,
+
+    .vel = {0.0f, 0.0f},
+    .grounded = false,
+
+    .type = ENTITY_NULL,
+    .next = NULL,
+    .prev = NULL,
+};
+
+typedef struct EntityWorld EntityWorld;
+struct EntityWorld {
+    struct {
+        Entity* first;
+        Entity* last;
+    } alive;
+    Entity* free_list;
+    WDL_Arena* arena;
+};
+
+EntityWorld entity_world_create(void) {
+    EntityWorld world = {
+        .arena = wdl_arena_create(),
+    };
+    wdl_arena_tag(world.arena, wdl_str_lit("entity"));
+    return world;
+}
+
+void entity_world_destroy(EntityWorld* world) {
+    wdl_arena_destroy(world->arena);
+}
 
 typedef struct Game Game;
 struct Game {
     f32 dt;
-    Entity entities[512];
     Camera cam;
+    EntityWorld ent_world;
 };
 
 static Game game;
 
+Entity* entity_spawn(void) {
+    EntityWorld* world = &game.ent_world;
+    Entity* ent;
+    if (world->free_list != NULL) {
+        ent = world->free_list;
+        wdl_sll_stack_pop(world->free_list);
+    } else {
+        ent = wdl_arena_push_no_zero(world->arena, sizeof(Entity));
+    }
+    *ent = ENTITY_DEFAULT;
+    wdl_dll_push_back(world->alive.first, world->alive.last, ent);
+    return ent;
+}
+
+void entity_kill(Entity* ent) {
+    EntityWorld* world = &game.ent_world;
+    wdl_dll_remove(world->alive.first, world->alive.last, ent);
+    wdl_sll_stack_push(world->free_list, ent);
+}
+
+// void func(Entity* ent)
+#define iter_alive_entities for (Entity* ent = game.ent_world.alive.first; ent != NULL; ent = ent->next)
+
 void app_startup(void) {
+    game.ent_world = entity_world_create();
+    game.cam = (Camera) {
+        .zoom = 32.0f,
+        .pos = wdl_v2(0.0f, 0.0f),
+        .invert_y = false,
+    };
+
     //
     // Assets
     //
@@ -65,16 +139,10 @@ void app_startup(void) {
             .type = ASSET_TYPE_FONT,
         });
 
-    game.cam = (Camera) {
-        .zoom = 32.0f,
-        .pos = wdl_v2(0.0f, 0.0f),
-        .invert_y = false,
-    };
-
     // Player
-    game.entities[0] = (Entity) {
+    Entity* player = entity_spawn();
+    *player = (Entity) {
         .type = ENTITY_PLAYER,
-        .alive = true,
 
         .pos = wdl_v2(0.0f, 0.0f),
         .size = wdl_v2(1.0f, 2.0f),
@@ -85,6 +153,9 @@ void app_startup(void) {
         .texture = asset_get(wdl_str_lit("player"), ASSET_TYPE_TEXTURE, GfxTexture),
         .color = COLOR_WHITE,
     };
+
+    Entity* enemy = entity_spawn();
+    enemy->renderable = true;
 }
 
 #define sign(V) ((V) > 0 ? 1 : (V) < 0 ? -1 : 0)
@@ -112,9 +183,8 @@ void app_update(void) {
     }
 
     // Player controller
-    for (u32 i = 0; i < wdl_arrlen(game.entities); i++) {
-        Entity* ent = &game.entities[i];
-        if (!ent->alive || ent->type != ENTITY_PLAYER) {
+    iter_alive_entities {
+        if (ent->type != ENTITY_PLAYER) {
             continue;
         }
 
@@ -187,6 +257,7 @@ void app_update(void) {
         game.cam.pos.y = lerp(game.cam.pos.y, ent->pos.y, game.dt * 4.0f);
     }
 
+
     if (key_down(KEY_DOWN)) {
         game.cam.zoom += 100.0f * game.dt;
     }
@@ -216,19 +287,19 @@ void app_update(void) {
         }
     }
 
-    for (u32 i = 0; i < wdl_arrlen(game.entities); i++) {
-        Entity* ent = &game.entities[i];
-        if (!ent->alive || !ent->renderable) {
+    iter_alive_entities {
+        if (!ent->renderable) {
             continue;
         }
         renderer_draw_quad_textured(renderer, ent->pivot, ent->pos, ent->size, ent->rot, ent->color, ent->texture);
-    }
+    };
 
     renderer_end(renderer);
 }
 
 void app_shutdown(void) {
     wdl_dump_arena_metrics();
+    entity_world_destroy(&game.ent_world);
 }
 
 // NOTE: GLFW calls any function called shutdown.
