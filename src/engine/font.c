@@ -1,7 +1,7 @@
 #include "engine/font.h"
 #include "engine/graphics.h"
-#include "engine/renderer.h"
 #include "engine/utils.h"
+#include "engine/renderer.h"
 
 #include <ft2build.h>
 #include FT_FREETYPE_H
@@ -439,8 +439,8 @@ Font* font_create(WDL_Arena* arena, WDL_Str filename) {
     // Push a zero onto the arena so the 'ttf_data' string works as a cstr as
     // well.
     wdl_arena_push(arena, 1);
-    // FontProvider provider = FT2_PROVIDER;
-    FontProvider provider = STBTT_PROVIDER;
+    FontProvider provider = FT2_PROVIDER;
+    // FontProvider provider = STBTT_PROVIDER;
     *font = (Font) {
         .arena = arena,
         .provider = provider,

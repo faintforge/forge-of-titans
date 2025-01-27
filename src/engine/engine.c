@@ -6,6 +6,7 @@
 #include "engine/graphics.h"
 #include "engine/assman.h"
 #include "engine/utils.h"
+#include "engine/font.h"
 
 #define set_const(T, var, value) (*(T*) &(var)) = (value)
 
@@ -168,7 +169,7 @@ WDL_Vec2 screen_to_world_space(WDL_Vec2 screen, Camera cam) {
 
     WDL_Vec4 v4_pos = wdl_v4(normalized.x, normalized.y, 0.0f, 1.0f);
     WDL_Vec4 world_pos = wdl_m4_mul_vec(proj, v4_pos);
-    return wdl_v2(world_pos.x, world_pos.y);
+    return wdl_v2_add(wdl_v2(world_pos.x, world_pos.y), cam.pos);
 }
 
 //
@@ -308,7 +309,7 @@ void renderer_draw_quad(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 s
     renderer_draw_quad_textured(rend, pivot, pos, size, rot, color, GFX_TEXTURE_NULL);
 }
 
-void renderer_draw_quad_textured(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color, GfxTexture texture) {
+void renderer_draw_quad_textured_uvs(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color, GfxTexture texture, WDL_Vec2 uvs[2]) {
     b8 texture_found = false;
     f32 texture_index = 0;
     if (gfx_texture_is_null(texture)) {
@@ -341,8 +342,8 @@ void renderer_draw_quad_textured(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, W
         wdl_v2( 0.5f,  0.5f),
     };
 
-    WDL_Vec2 nw = wdl_v2s(0.0f);
-    WDL_Vec2 se = wdl_v2s(1.0f);
+    WDL_Vec2 nw = uvs[0];
+    WDL_Vec2 se = uvs[1];
     const WDL_Vec2 uv[4] = {
         wdl_v2(nw.x, se.y),
         wdl_v2(se.x, se.y),
@@ -352,6 +353,7 @@ void renderer_draw_quad_textured(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, W
 
     if (rend->cam.invert_y) {
         pos.y = -pos.y;
+        pivot.y = -pivot.y;
     }
 
     pivot = wdl_v2_divs(pivot, 2.0f);
@@ -372,4 +374,51 @@ void renderer_draw_quad_textured(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, W
     }
 
     rend->curr_quad++;
+}
+
+void renderer_draw_quad_textured(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, WDL_Vec2 size, f32 rot, Color color, GfxTexture texture) {
+    renderer_draw_quad_textured_uvs(rend, pivot, pos, size, rot, color, texture, (WDL_Vec2[2]) {wdl_v2s(0.0f), wdl_v2s(1.0f)});
+}
+
+void renderer_draw_text(Renderer* rend, WDL_Str text, Font* font, WDL_Vec2 pos, Color color) {
+    FontMetrics metrics = font_get_metrics(font);
+    WDL_Vec2 _pos = wdl_v2(0.0f, metrics.ascent);
+    GfxTexture atlas = font_get_atlas(font);
+    Camera cam = rend->cam;
+    f32 aspect = (f32) cam.screen_size.x / (f32) cam.screen_size.y;
+    for (u64 i = 0; i < text.len; i++) {
+        Glyph glyph = font_get_glyph(font, text.data[i]);
+        WDL_Vec2 gpos = _pos;
+        gpos = wdl_v2_add(gpos, glyph.offset);
+        gpos.x /= cam.screen_size.x;
+        gpos.y /= cam.screen_size.y;
+        gpos.x *= cam.zoom * aspect;
+        gpos.y *= cam.zoom;
+
+        WDL_Vec2 pivot = wdl_v2s(-1.0f);
+        if (!cam.invert_y) {
+            gpos.y = -gpos.y;
+            pivot.y = -pivot.y;
+        }
+
+        gpos = wdl_v2_add(gpos, pos);
+
+        WDL_Vec2 size = glyph.size;
+        size.x /= cam.screen_size.x;
+        size.y /= cam.screen_size.y;
+        size.x *= cam.zoom * aspect;
+        size.y *= cam.zoom;
+        renderer_draw_quad_textured_uvs(rend,
+            pivot,
+            gpos,
+            size,
+            0.0f,
+            color,
+            atlas,
+            glyph.uv);
+        _pos.x += glyph.advance;
+        if (i > 0) {
+            pos.x += font_get_kerning(font, text.data[i - 1], text.data[i]);
+        }
+    }
 }

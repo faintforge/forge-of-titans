@@ -2,7 +2,7 @@
 #define FONT_H
 
 #include "waddle.h"
-#include "renderer.h"
+#include "graphics.h"
 
 // -- Forward facing API -------------------------------------------------------
 
@@ -34,6 +34,6 @@ extern FontMetrics font_get_metrics(const Font* font);
 extern f32         font_get_kerning(const Font* font, u32 left_codepoint, u32 right_codepoint);
 extern WDL_Vec2    font_measure_string(Font* font, WDL_Str str);
 
-extern void debug_font_atlas(const Font* font, Quad quad, Camera cam);
+// extern void debug_font_atlas(const Font* font, Quad quad, Camera cam);
 
 #endif // FONT_H
