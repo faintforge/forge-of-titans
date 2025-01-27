@@ -23,5 +23,4 @@ vec2 uv_iq(vec2 uv, ivec2 texture_size) {
 void main() {
     int iTextureIndex = int(textureIndex);
     FragColor = texture(textures[iTextureIndex], uv_iq(uv, textureSize(textures[iTextureIndex], 0))) * color;
-    // FragColor = texture(textures[iTextureIndex], uv_iq(uv, textureSize(textures[iTextureIndex], 0))).r * color;
 }

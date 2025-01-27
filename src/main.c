@@ -311,7 +311,7 @@ void app_update(void) {
     WDL_Vec2 pos = screen_to_world_space(mouse_pos(), game.cam);
     renderer_draw_quad(renderer, wdl_v2s(0.0f), pos, wdl_v2s(1.0f), 0.0f, COLOR_WHITE);
 
-    Font* font = asset_get(wdl_str_lit("tiny5"), ASSET_TYPE_FONT, Font*);
+    Font* font = asset_get(wdl_str_lit("spline-sans"), ASSET_TYPE_FONT, Font*);
     font_set_size(font, 32);
     renderer_draw_text(renderer, wdl_str_lit("World text"), font, wdl_v2(0.0f, 0.0f), COLOR_WHITE);
 

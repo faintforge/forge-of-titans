@@ -416,14 +416,14 @@ SizedFont sized_font_create(Font* font, u32 size) {
     WDL_Ivec2 atlas_size = wdl_iv2(256, 256);
     // Provide a buffer with zeros so the texture is properly cleared.
     WDL_Scratch scratch = wdl_scratch_begin(NULL, 0);
-    u8* zero_buffer = wdl_arena_push(scratch.arena, atlas_size.x * atlas_size.y);
+    u8* zero_buffer = wdl_arena_push(scratch.arena, atlas_size.x * atlas_size.y * 4);
     SizedFont sized = {
         .size = size,
         .atlas_packer = quadtree_atlas_init(font->arena, atlas_size),
         .atlas_texture = gfx_texture_new((GfxTextureDesc) {
                 .data = zero_buffer,
                 .size = atlas_size,
-                .format = GFX_TEXTURE_FORMAT_R_U8,
+                .format = GFX_TEXTURE_FORMAT_RGBA_U8,
                 .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
             }),
         .metrics = font->provider.get_metrics(font->internal, size),
@@ -488,10 +488,16 @@ static void expand_atlas(Font* font, SizedFont* sized) {
         iter = wdl_hm_iter_next(iter);
     }
 
+    u8* rgba_bitmap = wdl_arena_push(scratch.arena, packer.size.x * packer.size.y * 4);
+    for (i32 i = 0; i < packer.size.x * packer.size.y; i++) {
+        for (u32 j = 0; j < 4; j++) {
+            rgba_bitmap[i * 4 + j] = bitmap[i];
+        }
+    }
     gfx_texture_resize(sized->atlas_texture, (GfxTextureDesc) {
-            .data = bitmap,
+            .data = rgba_bitmap,
             .size = packer.size,
-            .format = GFX_TEXTURE_FORMAT_R_U8,
+            .format = GFX_TEXTURE_FORMAT_RGBA_U8,
             .sampler = GFX_TEXTURE_SAMPLER_LINEAR,
         });
     wdl_scratch_end(scratch);
@@ -525,12 +531,19 @@ Glyph font_get_glyph(Font* font, u32 codepoint) {
         expand_atlas(font, sized);
         return (Glyph) {0};
     }
+
+    u8* rgba_bitmap = wdl_arena_push(scratch.arena, bitmap_size * 4);
+    for (u32 i = 0; i < bitmap_size; i++) {
+        for (u32 j = 0; j < 4; j++) {
+            rgba_bitmap[i * 4 + j] = bitmap[i];
+        }
+    }
     gfx_texture_subdata(sized->atlas_texture, (GfxTextureSubDataDesc) {
             .size = fp_glyph.bitmap.size,
-            .format = GFX_TEXTURE_FORMAT_R_U8,
+            .format = GFX_TEXTURE_FORMAT_RGBA_U8,
             .alignment = 1,
             .pos = node->pos,
-            .data = bitmap,
+            .data = rgba_bitmap,
         });
 
     WDL_Vec2 atlas_size = wdl_v2(sized->atlas_packer.size.x, sized->atlas_packer.size.y);
