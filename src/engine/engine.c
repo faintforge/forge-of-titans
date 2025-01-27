@@ -139,7 +139,11 @@ static WDL_Mat4 camera_proj_inv(Camera cam) {
 static WDL_Mat4 camera_view(Camera cam) {
     WDL_Mat4 view = WDL_M4_IDENTITY;
     view.a.w = -cam.pos.x;
-    view.b.w = -cam.pos.y;
+    if (cam.invert_y) {
+        view.b.w = cam.pos.y;
+    } else {
+        view.b.w = -cam.pos.y;
+    }
     return view;
 }
 
@@ -152,7 +156,17 @@ WDL_Vec2 world_to_screen_space(WDL_Vec2 world, Camera cam) {
 
 WDL_Vec2 screen_to_world_space(WDL_Vec2 screen, Camera cam) {
     WDL_Mat4 proj = camera_proj_inv(cam);
-    WDL_Vec4 v4_pos = wdl_v4(screen.x, screen.y, 0.0f, 1.0f);
+
+    WDL_Vec2 sc = wdl_v2(cam.screen_size.x, cam.screen_size.y);
+    WDL_Vec2 normalized = screen;
+    normalized = wdl_v2_div(normalized, sc);
+    normalized = wdl_v2_subs(normalized, 0.5f);
+    normalized = wdl_v2_muls(normalized, 2.0f);
+    if (!cam.invert_y) {
+        normalized.y = -normalized.y;
+    }
+
+    WDL_Vec4 v4_pos = wdl_v4(normalized.x, normalized.y, 0.0f, 1.0f);
     WDL_Vec4 world_pos = wdl_m4_mul_vec(proj, v4_pos);
     return wdl_v2(world_pos.x, world_pos.y);
 }
