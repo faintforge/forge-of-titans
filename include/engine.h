@@ -33,12 +33,10 @@ extern WDL_Ivec2 get_screen_size(void);
 // Input
 
 extern b8 key_down(Key key);
-extern b8 key_up(Key key);
 extern b8 key_pressed(Key key);
 extern b8 key_released(Key key);
 
 extern b8 mouse_button_down(MouseButton button);
-extern b8 mouse_button_up(MouseButton button);
 extern b8 mouse_button_pressed(MouseButton button);
 extern b8 mouse_button_released(MouseButton button);
 extern WDL_Vec2 mouse_pos(void);

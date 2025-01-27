@@ -157,10 +157,6 @@ b8 window_key_down(const Window* window, Key key) {
     return window->keyboard[key].down;
 }
 
-b8 window_key_up(const Window* window, Key key) {
-    return !window->keyboard[key].down;
-}
-
 b8 window_key_pressed(const Window* window, Key key) {
     return window->keyboard[key].down && window->keyboard[key].first;
 }
@@ -175,10 +171,6 @@ WDL_Vec2 window_mouse_pos(const Window* window) {
 
 b8 window_mouse_button_down(const Window* window, MouseButton button) {
     return window->mouse.button[button].down;
-}
-
-b8 window_mouse_button_up(const Window* window, MouseButton button) {
-    return !window->mouse.button[button].down;
 }
 
 b8 window_mouse_button_pressed(const Window* window, MouseButton button) {

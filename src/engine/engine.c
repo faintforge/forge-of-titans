@@ -112,12 +112,10 @@ WDL_Ivec2 get_screen_size(void) { return window_get_size(engine.window); }
 // Input
 
 b8 key_down(Key key)     { return window_key_down(engine.window, key); }
-b8 key_up(Key key)       { return window_key_up(engine.window, key); }
 b8 key_pressed(Key key)  { return window_key_pressed(engine.window, key); }
 b8 key_released(Key key) { return window_key_released(engine.window, key); }
 
 b8 mouse_button_down(MouseButton button) { return window_mouse_button_down(engine.window, button); }
-b8 mouse_button_up(MouseButton button) { return window_mouse_button_up(engine.window, button); }
 b8 mouse_button_pressed(MouseButton button) { return window_mouse_button_pressed(engine.window, button); }
 b8 mouse_button_released(MouseButton button) { return window_mouse_button_released(engine.window, button); }
 WDL_Vec2 mouse_pos(void) { return window_mouse_pos(engine.window); }
