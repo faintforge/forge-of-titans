@@ -301,19 +301,24 @@ void app_update(void) {
     //     }
     // }
 
+    Font* font = asset_get(wdl_str_lit("spline-sans"), ASSET_TYPE_FONT, Font*);
+    font_set_size(font, 24.0f);
     iter_alive_entities {
         if (!ent->renderable) {
             continue;
         }
         renderer_draw_quad_textured(renderer, ent->pivot, ent->pos, ent->size, ent->rot, ent->color, ent->texture);
+
+        if (ent->type == ENTITY_PLAYER) {
+            WDL_Vec2 pos = ent->pos;
+            pos.y += ent->size.y;
+            pos.y += 0.2f;
+            renderer_draw_text(renderer, wdl_str_lit("Player"), font, wdl_v2(0.0f, -1.0f), pos, COLOR_WHITE);
+        }
     };
 
     WDL_Vec2 pos = screen_to_world_space(mouse_pos(), game.cam);
     renderer_draw_quad(renderer, wdl_v2s(0.0f), pos, wdl_v2s(1.0f), 0.0f, COLOR_WHITE);
-
-    Font* font = asset_get(wdl_str_lit("spline-sans"), ASSET_TYPE_FONT, Font*);
-    font_set_size(font, 32);
-    renderer_draw_text(renderer, wdl_str_lit("World text"), font, wdl_v2(0.0f, 0.0f), COLOR_WHITE);
 
     renderer_end(renderer);
 
@@ -326,8 +331,10 @@ void app_update(void) {
     };
     renderer_begin(renderer, ui_cam);
 
+    font_set_size(font, 32);
+    FontMetrics metrics = font_get_metrics(font);
     WDL_Str text = wdl_str_pushf(get_frame_arena(), "FPS: %u", last_fps);
-    renderer_draw_text(renderer, text, font, wdl_v2(16.0f, 16.0f), COLOR_WHITE);
+    renderer_draw_text(renderer, text, font, wdl_v2(-1.0f, -1.0f), wdl_v2(16.0f, get_screen_size().y - metrics.ascent - 16.0f), COLOR_WHITE);
 
     renderer_end(renderer);
 }

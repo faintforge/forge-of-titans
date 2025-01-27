@@ -380,12 +380,22 @@ void renderer_draw_quad_textured(Renderer* rend, WDL_Vec2 pivot, WDL_Vec2 pos, W
     renderer_draw_quad_textured_uvs(rend, pivot, pos, size, rot, color, texture, (WDL_Vec2[2]) {wdl_v2s(0.0f), wdl_v2s(1.0f)});
 }
 
-void renderer_draw_text(Renderer* rend, WDL_Str text, Font* font, WDL_Vec2 pos, Color color) {
-    FontMetrics metrics = font_get_metrics(font);
-    WDL_Vec2 _pos = wdl_v2(0.0f, metrics.ascent);
-    GfxTexture atlas = font_get_atlas(font);
+void renderer_draw_text(Renderer* rend, WDL_Str text, Font* font, WDL_Vec2 pivot, WDL_Vec2 pos, Color color) {
     Camera cam = rend->cam;
     f32 aspect = (f32) cam.screen_size.x / (f32) cam.screen_size.y;
+
+    WDL_Vec2 text_size = font_measure_string(font, text);
+
+    FontMetrics metrics = font_get_metrics(font);
+    WDL_Vec2 _pos = wdl_v2(0.0f, metrics.ascent);
+    pivot = wdl_v2_divs(pivot, 2.0f);
+    if (!cam.invert_y) {
+        pivot.y = -pivot.y;
+    }
+    _pos.x -= text_size.x * (pivot.x + 0.5f);
+    _pos.y -= text_size.y * (pivot.y + 0.5f);
+
+    GfxTexture atlas = font_get_atlas(font);
     for (u64 i = 0; i < text.len; i++) {
         Glyph glyph = font_get_glyph(font, text.data[i]);
         WDL_Vec2 gpos = _pos;
@@ -395,10 +405,10 @@ void renderer_draw_text(Renderer* rend, WDL_Str text, Font* font, WDL_Vec2 pos, 
         gpos.x *= cam.zoom * aspect;
         gpos.y *= cam.zoom;
 
-        WDL_Vec2 pivot = wdl_v2s(-1.0f);
+        WDL_Vec2 gpivot = wdl_v2s(-1.0f);
         if (!cam.invert_y) {
             gpos.y = -gpos.y;
-            pivot.y = -pivot.y;
+            gpivot.y = -gpivot.y;
         }
 
         gpos = wdl_v2_add(gpos, pos);
@@ -409,7 +419,7 @@ void renderer_draw_text(Renderer* rend, WDL_Str text, Font* font, WDL_Vec2 pos, 
         size.x *= cam.zoom * aspect;
         size.y *= cam.zoom;
         renderer_draw_quad_textured_uvs(rend,
-            pivot,
+            gpivot,
             gpos,
             size,
             0.0f,
