@@ -1,6 +1,6 @@
 [submodule "waddle"]
-	path = waddle
+	path = engine/waddle
 	url = git@github.com:VariableGoose/waddle.git
 [submodule "third_party/freetype"]
-	path = third_party/freetype
+	path = engine/third_party/freetype
 	url = https://gitlab.freedesktop.org/freetype/freetype.git
