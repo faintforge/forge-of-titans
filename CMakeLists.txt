@@ -41,3 +41,12 @@ if (EMSCRIPTEN)
     )
     set(CMAKE_EXECUTABLE_SUFFIX ".html")
 endif ()
+
+# Tools
+
+add_executable(test tools/test.c)
+set_target_properties(test
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin"
+)
+target_link_libraries(test engine)
