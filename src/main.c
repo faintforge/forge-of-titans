@@ -3,6 +3,7 @@
 #include "engine/font.h"
 #include "engine/graphics.h"
 #include "waddle.h"
+#include "tile.h"
 
 typedef enum EntityType {
     ENTITY_NULL,
@@ -77,6 +78,7 @@ struct Game {
     f32 dt;
     Camera cam;
     EntityWorld ent_world;
+    TileType tile_world[64 * 64];
 };
 
 static Game game;
@@ -120,6 +122,7 @@ void app_startup(void) {
     asset_load_texture(wdl_str_lit("player"), wdl_str_lit("assets/textures/blacksmith.png"), GFX_TEXTURE_SAMPLER_LINEAR);
     asset_load_texture(wdl_str_lit("sky"), wdl_str_lit("assets/textures/sky_bg.png"), GFX_TEXTURE_SAMPLER_LINEAR);
     asset_load_texture(wdl_str_lit("dirt"), wdl_str_lit("assets/textures/dirt_tile.png"), GFX_TEXTURE_SAMPLER_LINEAR);
+    asset_load_texture(wdl_str_lit("tile404"), wdl_str_lit("assets/textures/tile404.png"), GFX_TEXTURE_SAMPLER_LINEAR);
 
     // Fonts
     asset_load_font(wdl_str_lit("tiny5"), wdl_str_lit("assets/fonts/Tiny5/Tiny5-Regular.ttf"));
@@ -263,32 +266,34 @@ void app_update(void) {
     WDL_Vec2 full_screen_quad_size = wdl_v2(aspect * game.cam.zoom, game.cam.zoom);
     renderer_draw_quad_textured(renderer, wdl_v2s(0.0f), game.cam.pos, full_screen_quad_size, 0.0, COLOR_WHITE, asset_get_texture(wdl_str_lit("sky")));
 
-    {
-        Sprite top = {
-            .sheet = asset_get_texture(wdl_str_lit("dirt")),
-            .pos = wdl_iv2(8, 0),
-            .size = wdl_iv2(8, 8),
-        };
-        for (u32 x = 0; x < 4; x++) {
-            renderer_draw_sprite(renderer, wdl_v2(0.0f, 0.0f), wdl_v2(x, -1.5f), wdl_v2s(1.0f), 0.0f, COLOR_WHITE, top);
-        }
+    // Tiles
+    for (i32 y = 0; y < 64; y++) {
+        for (i32 x = 0; x < 64; x++) {
+            TileType type = game.tile_world[x + y * 64];
+            if (type == TILE_NONE) {
+                continue;
+            }
 
-        Sprite middle = {
-            .sheet = asset_get_texture(wdl_str_lit("dirt")),
-            .pos = wdl_iv2(8, 8),
-            .size = wdl_iv2(8, 8),
-        };
-        for (u32 x = 0; x < 4; x++) {
-            renderer_draw_sprite(renderer, wdl_v2(0.0f, 0.0f), wdl_v2(x, -2.5f), wdl_v2s(1.0f), 0.0f, COLOR_WHITE, middle);
-        }
+            TileNeighbor neighbor_index = 0;
+            for (i32 ny = -1; ny < 2; ny++) {
+                if (y + ny < 0 || y + ny >= 64) {
+                    continue;
+                }
+                for (i32 nx = -1; nx < 2; nx++) {
+                    if (x + nx < 0 || x + nx >= 64) {
+                        continue;
+                    }
 
-        Sprite bottom = {
-            .sheet = asset_get_texture(wdl_str_lit("dirt")),
-            .pos = wdl_iv2(8, 16),
-            .size = wdl_iv2(8, 8),
-        };
-        for (u32 x = 0; x < 4; x++) {
-            renderer_draw_sprite(renderer, wdl_v2(0.0f, 0.0f), wdl_v2(x, -3.5f), wdl_v2s(1.0f), 0.0f, COLOR_WHITE, bottom);
+                    if (game.tile_world[(x + nx) + (y + ny) * 64] == TILE_NONE) {
+                        continue;
+                    }
+                    neighbor_index |= TILE_NEIGHBOR_GRID[(nx + 1) + (ny + 1) * 3];
+                }
+            }
+
+            Sprite sprite = TILE_NEIGHBOR_SPRITE_LOOKUP[neighbor_index];
+            sprite.sheet = asset_get_texture(wdl_str_lit("tile404"));
+            renderer_draw_sprite(renderer, wdl_v2s(0.0f), wdl_v2(x, y), wdl_v2s(1.0), 0.0, COLOR_WHITE, sprite);
         }
     }
 
@@ -309,7 +314,17 @@ void app_update(void) {
     };
 
     WDL_Vec2 pos = screen_to_world_space(mouse_pos(), game.cam);
+    pos.x = roundf(pos.x);
+    pos.y = roundf(pos.y);
     renderer_draw_quad(renderer, wdl_v2s(0.0f), pos, wdl_v2s(1.0f), 0.0f, COLOR_WHITE);
+
+    WDL_Ivec2 ipos = wdl_v2_to_iv2(pos);
+    if (mouse_button_down(MOUSE_BUTTON_LEFT)) {
+        game.tile_world[ipos.x + ipos.y * 64] = TILE_404;
+    }
+    if (mouse_button_down(MOUSE_BUTTON_RIGHT)) {
+        game.tile_world[ipos.x + ipos.y * 64] = TILE_NONE;
+    }
 
     renderer_end(renderer);
 
